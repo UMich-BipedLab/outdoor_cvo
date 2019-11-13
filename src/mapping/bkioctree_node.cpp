@@ -67,9 +67,14 @@ namespace semantic_bki {
 
       semantics = std::distance(probs.begin(), std::max_element(probs.begin(), probs.end()));
 
+
       if (semantics == 0)
         state = State::FREE;
-      else
-        state = State::OCCUPIED;
+      else {
+        float p = 1 - probs[0];
+        state = p > Occupancy::occupied_thresh ? State::OCCUPIED : (p < Occupancy::free_thresh ? State::FREE : State::UNKNOWN);
+      }
+      //else
+        //state = State::OCCUPIED;
     }
 }
