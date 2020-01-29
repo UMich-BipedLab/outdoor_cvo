@@ -31,6 +31,7 @@ namespace cvo{
     ell(0.1*7),
     ell_min(0.0391*7),
     ell_max(0.15*7),
+    ell_max_fixed(0.15*7),
     dl(0),
     dl_step(0.3),
     min_dl_step(0.05),
@@ -63,11 +64,12 @@ namespace cvo{
     if (ptr!=NULL) 
     {
       std::cout<<"reading cvo params from file\n";
-      fscanf(ptr, "%f\n%f\n%f\n%f\n%lf\n%lf\n%f\n%f\n%f\n%f\n%f\n%f\n%f\n%f\n%f\n%f\n%d\n%f\n%f\n%f\n",
+      fscanf(ptr, "%f\n%f\n%f\n%f\n%f\n%lf\n%lf\n%f\n%f\n%f\n%f\n%f\n%f\n%f\n%f\n%f\n%f\n%d\n%f\n%f\n%f\n",
              &ell_init
              ,& ell
              ,& ell_min
-             ,& ell_max
+	     ,& ell_max
+             ,& ell_max_fixed
              ,& dl
              ,& dl_step
              ,& min_dl_step
@@ -100,6 +102,7 @@ namespace cvo{
     ell(0.1*7),
     ell_min(0.0391*7),
     ell_max(0.15*7),
+    ell_max_fixed(0.55),
     dl(0),
     dl_step(0.3),
     min_dl_step(0.05),
@@ -132,11 +135,12 @@ namespace cvo{
     if (ptr!=NULL) 
     {
       std::cout<<"reading cvo params from file\n";
-      fscanf(ptr, "%f\n%f\n%f\n%f\n%lf\n%lf\n%f\n%f\n%f\n%f\n%f\n%f\n%f\n%f\n%f\n%f\n%d\n%f\n%f\n%f\n",
+      fscanf(ptr, "%f\n%f\n%f\n%f\n%f\n%lf\n%lf\n%f\n%f\n%f\n%f\n%f\n%f\n%f\n%f\n%f\n%f\n%d\n%f\n%f\n%f\n",
              &ell_init
              ,& ell
              ,& ell_min
              ,& ell_max
+             ,& ell_max_fixed
              ,& dl
              ,& dl_step
              ,& min_dl_step
@@ -453,21 +457,18 @@ namespace cvo{
 
     auto start = chrono::system_clock::now();
     auto end = chrono::system_clock::now();
-                            
+ 
     // compute SE kernel for Axy
     se_kernel(ptr_fixed_pcd,ptr_moving_pcd,cloud_x,cloud_y,A, A_trip_concur);
 
     if (debug_print ) {std::cout<<"nonzeros in A "<<A.nonZeros()<<std::endl;
     }
-    
     // compute SE kernel for Axx and Ayy
     se_kernel(ptr_fixed_pcd,ptr_fixed_pcd,cloud_x,cloud_x,Axx, A_trip_concur);
-    
     //start = chrono::system_clock::now();
     se_kernel(ptr_moving_pcd,ptr_moving_pcd,cloud_y,cloud_y,Ayy, A_trip_concur);
     //end = chrono::system_clock::now();
     //std::cout<<"time for this kernel is "<<(end- start).count()<<std::endl;
-
     // some initialization of the variables
     omega = Eigen::Vector3f::Zero();
     v = Eigen::Vector3f::Zero();
@@ -696,6 +697,47 @@ namespace cvo{
     
   }
 
+  // void cvo::convert_to_pcl_cloud(const CvoPointCloud& cvo_cloud, pcl::PointCloud<PointSegmentedDistribution> pcl_cloud){
+  //   int num_points = cvo_cloud.num_points();
+  //   ArrayVec3f positions = cvo_cloud.positions();
+  //   Eigen::Matrix<float, Eigen::Dynamic, FEATURE_DIMENSIONS> features = cvo_cloud.features();
+  //   Eigen::Matrix<float, Eigen::Dynamic, NUM_CLASSES> labels = cvo_cloud.labels();
+
+  //   // set basic informations for pcl_cloud
+  //   pcl_cloud.points.resize(num_points);
+  //   pcl_cloud.width = num_points;
+  //   pcl_cloud.height = 1;
+
+  //   // loop through all points 
+  //   for(int i=0; i<num_points; ++i){
+  //     // set positions
+  //     pcl_cloud.points[i].x = positions[i](0);
+  //     pcl_cloud.points[i].y = positions[i](1);
+  //     pcl_cloud.points[i].z = positions[i](2);
+      
+  //     // set rgb
+  //     pcl_cloud.points[i].r = features(i,0);
+  //     pcl_cloud.points[i].g = features(i,1);
+  //     pcl_cloud.points[i].b = features(i,2);
+
+  //     // extract features
+  //     for(int j=0; j<FEATURE_DIMENSIONS; ++j){
+  //       pcl_cloud.points[i].features[j] = features(i,j);
+  //     }
+  //     float cur_label_value = -1;
+  //     pcl_cloud.points[i].label = -1;
+
+  //     // extract labels
+  //     for(int k=0; k<NUM_CLASSES; ++k){
+  //       pcl_cloud.points[i].label_distribution[k] = labels(i,k);
+  //       if(pcl_cloud.points[i].label_distribution[k]>cur_label_value){
+  //         pcl_cloud.points[i].label = k;
+  //         cur_label_value = pcl_cloud.points[i].label_distribution[k];
+  //       }
+  //     }
+  //   }
+  // }
+
   int cvo::align(){
     int ret = 0;
     
@@ -857,6 +899,7 @@ namespace cvo{
 
     ell = ell_init;
     dl = 0;
+    ell_max = ell_max_fixed;
     A_trip_concur.reserve(num_moving*20);
     A.resize(num_fixed,num_moving);
     Axx.resize(num_fixed,num_fixed);

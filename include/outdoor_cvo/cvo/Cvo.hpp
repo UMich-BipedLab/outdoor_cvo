@@ -72,6 +72,7 @@ namespace cvo{
     float ell_init;
     float ell_min;
     float ell_max;
+    float ell_max_fixed;
     double dl;           // changes for ell in each iteration
     double dl_step;
     float min_dl_step;
@@ -181,6 +182,11 @@ namespace cvo{
      * @brief transform cloud_y for current update
      */
     void transform_pcd();
+
+    /**
+     * 
+     **/
+    // void convert_to_pcl_cloud(const CvoPointCloud& cvo_cloud, pcl::PointCloud<PointSegmentedDistribution> pcl_cloud);
 
   public:
     // public funcitons

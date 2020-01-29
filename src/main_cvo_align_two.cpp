@@ -26,7 +26,6 @@ int main(int argc, char *argv[]) {
   bool use_semantic = false;
   if (argc > 8) {
     num_class = stoi(argv[8]);
-    std::cout<<"num_classes: "<<num_class<<std::endl;
     use_semantic_str = "_semantic";
     use_semantic = true;
   }
@@ -54,7 +53,7 @@ int main(int argc, char *argv[]) {
   if(mode==0){
     total_num = kitti.get_total_number();
   }
-  else if(mode==1){
+  else if(mode==1 || mode==2){
     // cycle through the directory
     std::cout<<"reading cvo points from txt files..."<<std::endl;
     for(auto & p : boost::filesystem::directory_iterator( txt_pth ) )
@@ -93,9 +92,7 @@ int main(int argc, char *argv[]) {
       if(use_semantic){
         // create first frame for kf
         if (kitti.read_next_stereo(left, right, num_class, semantics ) == 0) {
-          std::shared_ptr<cvo::Frame> temp_source(new cvo::Frame(start_frame, left, right, num_class, semantics, calib ));
-          source_frame = temp_source;
-          // source_frame = make_shared<cvo::Frame>(start_frame, left, right, num_class, semantics, calib );
+          source_frame = make_shared<cvo::Frame>(start_frame, left, right, num_class, semantics, calib );
         }
       }
       else{
@@ -104,7 +101,6 @@ int main(int argc, char *argv[]) {
           source_frame = make_shared<cvo::Frame>(start_frame, left, right, calib);
         }
       }
-      
   }
 
   // start the iteration
@@ -125,14 +121,11 @@ int main(int argc, char *argv[]) {
     // load next image
     // mode 0: online point cloud generation, mode 1: load point cloud from txt
     if(mode==0){
+
         if(use_semantic){
           // load image and semantic and create point cloud into cvo::Frame
           if (kitti.read_next_stereo(left, right, num_class, semantics ) == 0) {
-            std::cout<<"before creating target"<<std::endl;
-            std::shared_ptr<cvo::Frame> temp_target(new cvo::Frame(i, left, right, num_class, semantics, calib ) );
-            target_frame = temp_target;
-            // target_frame = make_shared<cvo::Frame>(i, left, right, num_class, semantics, calib );
-            std::cout<<"after creating target"<<std::endl;
+            target_frame = make_shared<cvo::Frame>(i, left, right, num_class, semantics, calib );
           }
         }
         else{
@@ -154,6 +147,18 @@ int main(int argc, char *argv[]) {
       target_fr.read_cvo_pointcloud_from_file(files[i+start_frame]);
       const cvo::CvoPointCloud &const_source_fr = source_fr;
       const cvo::CvoPointCloud &const_target_fr = target_fr;
+      
+      cvo_align.set_pcd(const_source_fr, const_target_fr, init_guess, true);
+      cvo_align.align();
+    }
+    else if(mode==2){
+
+      
+      cvo::CvoPointCloud source_fr(files[i-1+start_frame]);
+      cvo::CvoPointCloud target_fr(files[i-1+start_frame]);
+      const cvo::CvoPointCloud &const_source_fr = source_fr;
+      const cvo::CvoPointCloud &const_target_fr = target_fr;
+      
       cvo_align.set_pcd(const_source_fr, const_target_fr, init_guess, true);
       cvo_align.align();
     }

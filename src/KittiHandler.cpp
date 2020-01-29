@@ -70,7 +70,7 @@ namespace cvo {
 
     if (debug_plot)
       visualize_semantic_image("last_semantic.png", semantics.data(), num_semantic_class, left.cols, left.rows );
-
+    
     return 0;
   }
 

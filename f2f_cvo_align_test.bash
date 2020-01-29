@@ -1,7 +1,7 @@
 mode=0  # 0 for online generated points 1 for reading txt
 # dataset="05"
 
-for dataset in 04
+for dataset in 02 03 04 05 06 07
 do
     path="/media/justin/LaCie/data/kitti/sequences/"$dataset
     pcd_path="cvo_points/"
