@@ -10,6 +10,7 @@
 
 #include "utils/CvoPointCloud.hpp"
 #include "cvo/Cvo.hpp"
+#include "cvo/ACvo.hpp"
 #include "graph_optimizer/Frame.hpp"
 #include "dataset_handler/KittiHandler.hpp"
 #include "utils/Calibration.hpp"
@@ -71,7 +72,7 @@ int main(int argc, char *argv[]) {
   }
  
   
-  cvo::cvo cvo_align;
+  cvo::acvo cvo_align;
   Eigen::Affine3f init_guess;
   init_guess.matrix().setIdentity();
   // init_guess.matrix()(2,3)=0.75;
@@ -101,7 +102,9 @@ int main(int argc, char *argv[]) {
       else{
         // create first frame for kf
         if(kitti.read_next_stereo(left, right) == 0){
-          source_frame = make_shared<cvo::Frame>(start_frame, left, right, calib);
+          std::shared_ptr<cvo::Frame> temp_source(new cvo::Frame(start_frame, left, right, calib));
+          source_frame = temp_source;
+          // source_frame = make_shared<cvo::Frame>(start_frame, left, right, calib);
         }
       }
       
@@ -116,7 +119,7 @@ int main(int argc, char *argv[]) {
     }
     else{
       init_guess.setIdentity();
-      init_guess.matrix()(2,3)=-0.75;
+      // init_guess.matrix()(2,3)=-0.75;
     }
 
     std::cout<<"\n============================================="<<std::endl;
@@ -128,17 +131,19 @@ int main(int argc, char *argv[]) {
         if(use_semantic){
           // load image and semantic and create point cloud into cvo::Frame
           if (kitti.read_next_stereo(left, right, num_class, semantics ) == 0) {
-            std::cout<<"before creating target"<<std::endl;
+            // std::cout<<"before creating target"<<std::endl;
             std::shared_ptr<cvo::Frame> temp_target(new cvo::Frame(i, left, right, num_class, semantics, calib ) );
             target_frame = temp_target;
             // target_frame = make_shared<cvo::Frame>(i, left, right, num_class, semantics, calib );
-            std::cout<<"after creating target"<<std::endl;
+            // std::cout<<"after creating target"<<std::endl;
           }
         }
         else{
           // load image and create point cloud into cvo::Frame
           if(kitti.read_next_stereo(left, right) == 0){
-            target_frame = make_shared<cvo::Frame>(i, left, right, calib);
+            std::shared_ptr<cvo::Frame> temp_target(new cvo::Frame(i, left, right, calib) );
+            target_frame = temp_target;
+            // target_frame = make_shared<cvo::Frame>(i, left, right, calib);
           }
         }
         auto& source_fr = source_frame->points(); // keyframe
