@@ -68,10 +68,10 @@ namespace cvo{
     ArrayVec3f *cloud_x;    // target points represented as a matrix (num_fixed,3)
     ArrayVec3f *cloud_y;    // source points represented as a matrix (num_moving,3)
 
-    float ell;          // kernel characteristic length-scale
+    
     float ell_init;
     float ell_min;
-    float ell_max;
+
     float ell_max_fixed;
     float ell_reduced_1;
     float ell_reduced_2;
@@ -111,7 +111,8 @@ namespace cvo{
   public:
     
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-    
+    float ell;          // kernel characteristic length-scale
+    float ell_max;
     // public variables
     bool init;          // initialization indicator
     int iter;           // final iteration for display

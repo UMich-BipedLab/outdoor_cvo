@@ -813,13 +813,14 @@ namespace cvo{
         break;
       }
 
-      ell = ell + dl_step*dl;
+      ell = ell - dl_step*dl;
       if(ell>=ell_max){
         ell = ell_max*0.7;
         ell_max = ell_max*0.7;
       }
               
       ell = (ell<ell_min)? ell_min:ell;
+      // std::cout<<ell<<std::endl;
 
       // std::cout<<"iter: "<<k<<std::endl;
       if(debug_print){
