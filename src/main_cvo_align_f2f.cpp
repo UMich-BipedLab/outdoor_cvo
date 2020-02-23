@@ -123,6 +123,7 @@ int main(int argc, char *argv[]) {
     }
 
     std::cout<<"\n============================================="<<std::endl;
+    std::cout<<"pth: "<<pth<<std::endl;
     std::cout<<"Aligning "<<i-1<<" and "<<i<<std::endl;
 
     // load next image
