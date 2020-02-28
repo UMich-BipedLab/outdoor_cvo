@@ -43,6 +43,8 @@ namespace cvo {
     int num_fixed;
     int num_moving;
     float ell;          // kernel characteristic length-scale
+    Eigen::Matrix3f ell_mat;
+    Eigen::Matrix3f * ell_mat_gpu_inv;
     float ell_max;
 
     
@@ -153,6 +155,17 @@ namespace cvo {
     cloud_x_gpu = source_points;
     cloud_y_gpu_init = target_points;
     cloud_y_gpu.reset(new CvoPointCloudGPU(num_moving ) );
+
+    ell_mat << cvo_params.ell_x * cvo_params.ell_x , 0, 0,
+      0, cvo_params.ell_y * cvo_params.ell_y, 0,
+      0, 0, cvo_params.ell_z * cvo_params.ell_z;
+
+    //if (cvo_params.ell_x  > 0 && cvo_params.ell_y > 0 && cvo_params.ell_z > 0) {
+      Eigen::Matrix3f ell_mat_inv = ell_mat.inverse() * 0.5;
+      
+      cudaMalloc((void**) &ell_mat_gpu_inv, sizeof(Eigen::Matrix3f));
+      cudaMemcpy(ell_mat_gpu_inv, &ell_mat_inv, sizeof(Eigen::Matrix3f), cudaMemcpyHostToDevice);
+      //}
     /*
     if (!is_ell_adaptive) {
       printf("Build kdtree...\n");
@@ -173,8 +186,9 @@ namespace cvo {
     cudaFree(T_gpu);
     cudaFree(omega);
     cudaFree(v);
-
+    cudaFree(ell_mat_gpu_inv);
     delete_SparseKernelMat_gpu(A, &A_host);
+    
     if (is_ell_adaptive) {
       delete_SparseKernelMat_gpu(Axx, &Axx_host);
       delete_SparseKernelMat_gpu(Ayy, &Ayy_host);

@@ -14,6 +14,7 @@
 #include <pcl/point_types.h>
 #include "utils/CvoPointCloud.hpp"
 #include "cvo/CvoGPU.hpp"
+//#include "cvo/AdaptiveCvoGPU.hpp"
 #include "cvo/Cvo.hpp"
 using namespace std;
 using namespace boost::filesystem;
@@ -37,10 +38,16 @@ int main(int argc, char *argv[]) {
 
   
   cvo::CvoGPU cvo_align(cvo_param_file );
+  //cvo::AdaptiveCvoGPU cvo_align(cvo_param_file );
   cvo::CvoParams & init_param = cvo_align.get_params();
-  float ell_init = init_param.ell_init;
-  float ell_max = init_param.ell_max;
+  cvo::CvoParams init_p = init_param;
+  //float ell_init = init_param.ell_init;
+  //float ell_x = init_param.ell
+  //float ell_max = init_param.ell_max;
   init_param.ell_init = 0.7;
+  init_param.ell_x = 0.7;
+  init_param.ell_y = 0.7;
+  init_param.ell_z = 0.7;
   init_param.ell_max = 0.75;
   cvo_align.write_params(&init_param);
   
@@ -114,9 +121,10 @@ int main(int argc, char *argv[]) {
    
     source = target;
     if (i == start_frame) {
-      init_param.ell_init = ell_init;
-      init_param.ell_max = ell_max;
-      cvo_align.write_params(&init_param);
+      //init_param.ell_init = ell_init;
+      //init_param.ell_max = ell_max;
+      std::cout<<"ell_init is "<<init_p.ell_init<<", x is "<<init_p.ell_x<<"\n";
+      cvo_align.write_params(&init_p);
       
     } //else if (i < start_frame + 20)  {
       //init_param.ell_init =  1.0;

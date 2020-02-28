@@ -71,6 +71,14 @@ namespace cvo {
                    // output
                    SparseKernelMat * A_mat, SparseKernelMat * A_mat_gpu
                    );
+    void se_kernel(const CvoParams * params_gpu,
+                   std::shared_ptr<CvoPointCloudGPU> points_fixed,
+                   std::shared_ptr<CvoPointCloudGPU> points_moving,
+                   Eigen::Matrix3f * ell_mat_gpu_inv,
+                   //perl_registration::cuKdTree<CvoPoint>::SharedPtr kdtree,
+                   // output
+                   SparseKernelMat * A_mat, SparseKernelMat * A_mat_gpu
+                   );
    
 
     /**

@@ -359,11 +359,11 @@ namespace cvo{
           float a = ck*k*sk;
           
           //#endif
-          //if (i == 1000 && j == 1074) {
+          if (i == 1000 && j == 1074) {
           // if (i == 1000)
-          //  printf("se_kernel: i=%d,j=%d: d2_color is %f, d2_c_thres is %f,k is %f, ck is %f\n", i,j,d2_color, d2_c_thres, k, ck );
+              printf("se_kernel: i=%d,j=%d: d2_color is %f, d2_c_thres is %f,k is %f, ck is %f\n", i,j,d2_color, d2_c_thres, k, ck );
             //  printf("se_kernel: i==1000: k is %f, ck is %f\n", k, ck );
-            //}
+          }
 
 
           // concrrent access !
@@ -1109,8 +1109,8 @@ namespace cvo{
     chrono::duration<double> t_compute_step = chrono::duration<double>::zero();
 
     std::cout<<"Start iteration, init ell is "<<params.ell_init<<", max_iter is "<<params.MAX_ITER<<std::endl;
-    for(int k=0; k<params.MAX_ITER; k++){
-    //for(int k=0; k<2; k++){
+    //for(int k=0; k<params.MAX_ITER; k++){
+    for(int k=0; k<2; k++){
       if (debug_print) printf("new iteration...., dl is %f\n", cvo_state.ell);
       cvo_state.reset_state_at_new_iter();
       if (debug_print) printf("just reset A mat\n");

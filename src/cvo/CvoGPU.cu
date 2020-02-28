@@ -170,7 +170,7 @@ namespace cvo{
   void CvoGPU::write_params(CvoParams * p_cpu) {
     //params = *p_cpu;
     cudaMemcpy( (void*)params_gpu, p_cpu, sizeof(CvoParams), cudaMemcpyHostToDevice  );
-    
+    params  = *p_cpu;
   }
 
 
@@ -262,6 +262,20 @@ namespace cvo{
 
   typedef KDTreeVectorOfVectorsAdaptor<cloud_t, float>  kd_tree_t;
 
+  
+  __device__
+  float se_dist(CvoPoint * pa, CvoPoint * pb, Eigen::Matrix3f * ell_mat_inv ) {
+    Eigen::Vector3f a;
+    a << pa->x, pa->y, pa->z;
+    Eigen::Vector3f b;
+    b << pb->x, pb->y, pb->z;
+
+    Eigen::Vector3f dist = a - b;
+    return exp( (-dist.transpose() * *ell_mat_inv * dist).value());
+      
+    
+  }
+
   __global__
   void fill_in_A_mat_gpu(const CvoParams * cvo_params,
                          //SquareExpParams * se_params,
@@ -270,7 +284,7 @@ namespace cvo{
                          CvoPoint * points_b,
                          int b_size,
                          int * kdtree_inds,
-                         float ell,
+                         Eigen::Matrix3f * ell_mat_inv,
                          // output
                          SparseKernelMat * A_mat // the kernel matrix!
                          ) {
@@ -279,14 +293,14 @@ namespace cvo{
       return;
 
     float s2= cvo_params->sigma * cvo_params->sigma;
-    float l = ell ;
+
     float c_ell = cvo_params->c_ell;
     float s_ell = cvo_params->s_ell;
     float sp_thres = cvo_params->sp_thres;
     float c_sigma = cvo_params->c_sigma;
 
     // convert k threshold to d2 threshold (so that we only need to calculate k when needed)
-    float d2_thres = -2.0*l*l*log(sp_thres/s2);
+    //float d2_thres = -2.0*l*l*log(sp_thres/s2);
     float d2_c_thres = -2.0*c_ell*c_ell*log(sp_thres/c_sigma/c_sigma);
 
     //Eigen::VectorXf feature_a = feature_a_gpu->row(i).transpose();
@@ -309,23 +323,24 @@ namespace cvo{
       //A_mat->mat[i * A_mat->cols + ind_b] = 0;
       //A_mat->ind_row2col[i * A_mat->cols + ind_b] = -1;
       
-      
+
       //float d2 = (cloud_y_gpu[ind_b] - cloud_x_gpu[i]).squaredNorm();
       // d2 = (x-y)^2
       CvoPoint * p_b = &points_b[ind_b];
-      float d2 = (squared_dist( *p_b ,*p_a ));
+      //float d2 = (squared_dist( *p_b ,*p_a ));
+      float k = s2 * se_dist(p_a, p_b, ell_mat_inv);
       /*
       if ( i == 1000 && j== 1074) {
         CvoPoint * pb = points_b + j;
-        printf("gpu se_kernel: i==%d,j==%d: d2 is %f, d2_thres is %f, point_a (%f, %f, %f), point_b: (%f, %f, %f)\n", i, j,d2, d2_thres,
+        printf("gpu se_kernel: i==%d,j==%d: d2 is %f,  s2 is %f, point_a (%f, %f, %f), point_b: (%f, %f, %f)\n", i, j, k, s2,
                p_a->x, p_a->y, p_a->z,
                pb->x, pb->y,  pb->z );
                }*/
       
-      if(d2<d2_thres  ){
-
+      //if(d2<d2_thres  ){
+      if(k>sp_thres  ){
 #ifdef IS_GEOMETRIC_ONLY
-        float a = 1.0;
+        float a = k;
         if (a > cvo_params->sp_thres){
           A_mat->mat[i * A_mat->cols + num_inds] = a;
           A_mat->ind_row2col[i * A_mat->cols + num_inds] = ind_b;
@@ -361,7 +376,7 @@ namespace cvo{
           //#else
         
           
-          float k = s2*exp(-d2/(2.0*l*l));
+          //float k = s2*exp(-d2/(2.0*l*l));
           float ck = c_sigma*c_sigma*exp(-d2_color/(2.0*c_ell*c_ell));
 #ifdef IS_USING_SEMANTICS              
           float sk = cvo_params->s_sigma*cvo_params->s_sigma*exp(-d2_semantic/(2.0*s_ell*s_ell));
@@ -371,11 +386,10 @@ namespace cvo{
           float a = ck*k*sk;
           //#endif          
 
-          //if (i == 1000 && j == 1074)
-          //  printf("se_kernel: i=%d,j=%d: d2_color is %f, d2_c_thres is %f,k is %f, ck is %f\n", i,j,d2_color, d2_c_thres, k, ck );
-          //printf("se_kernel: i==1000: k is %f, ck is %f\n", k, ck );
-
-
+          /*
+          if (i == 1000 && j == 1074)
+            printf("se_kernel: i=%d,j=%d: d2_color is %f, d2_c_thres is %f,k is %f, ck is %f\n", i,j,d2_color, d2_c_thres, k, ck );
+          */
 
           // concrrent access !
           if (a > cvo_params->sp_thres){
@@ -420,7 +434,6 @@ namespace cvo{
     
   }
 
-
   __global__
   void fill_in_A_mat_gpu_with_kdtree(const CvoParams * cvo_params,
                                      //SquareExpParams * se_params,
@@ -429,7 +442,7 @@ namespace cvo{
                                      CvoPoint * points_b,
                                      int b_size,
                                      int * kdtree_inds,
-                                     float ell,
+                                     Eigen::Matrix3f * ell_mat_inv,
                                      // output
                                      SparseKernelMat * A_mat // the kernel matrix!
                                      ) {
@@ -438,14 +451,15 @@ namespace cvo{
       return;
 
     float s2= cvo_params->sigma * cvo_params->sigma;
-    float l = ell ;
+    //float l = ell ;
     float c_ell = cvo_params->c_ell;
     float s_ell = cvo_params->s_ell;
     float sp_thres = cvo_params->sp_thres;
     float c_sigma = cvo_params->c_sigma;
 
     // convert k threshold to d2 threshold (so that we only need to calculate k when needed)
-    float d2_thres = -2.0*l*l*log(sp_thres/s2);
+    //float d2_thres = -2.0*l*l*log(sp_thres/s2);
+
     float d2_c_thres = -2.0*c_ell*c_ell*log(sp_thres/c_sigma/c_sigma);
 
     //Eigen::VectorXf feature_a = feature_a_gpu->row(i).transpose();
@@ -468,7 +482,8 @@ namespace cvo{
       
       //float d2 = (cloud_y_gpu[ind_b] - cloud_x_gpu[i]).squaredNorm();
       // d2 = (x-y)^2
-      float d2 = (squared_dist( *p_b ,*p_a ));
+      //float d2 = (squared_dist( *p_b ,*p_a ));
+      float k = s2 * se_dist(p_a, p_b, ell_mat_inv);
       /*
       if ( i == 1000 && j== 1074) {
         CvoPoint * pb = points_b + j;
@@ -476,8 +491,8 @@ namespace cvo{
                p_a->x, p_a->y, p_a->z,
                pb->x, pb->y,  pb->z );
                }*/
-      
-      if(d2<d2_thres  ){
+      if (k > sp_thres) {
+      //if(d2<d2_thres  ){
         //float feature_b[5] = {(float)p_a->r, (float)p_a->g, (float)p_a->b,  p_a->gradient[0], p_a->gradient[1]  };
         float d2_color = squared_dist<float>(p_a->features, p_b->features, FEATURE_DIMENSIONS);
 
@@ -500,7 +515,7 @@ namespace cvo{
 
             
         if(d2_color<d2_c_thres){
-          float k = s2*exp(-d2/(2.0*l*l));
+          //float k = s2*exp(-d2/(2.0*l*l));
           float ck = c_sigma*c_sigma*exp(-d2_color/(2.0*c_ell*c_ell));
 #ifdef IS_USING_SEMANTICS              
           float sk = cvo_params->s_sigma*cvo_params->s_sigma*exp(-d2_semantic/(2.0*s_ell*s_ell));
@@ -565,8 +580,8 @@ namespace cvo{
                  const CvoParams * params_gpu,
                  std::shared_ptr<CvoPointCloudGPU> points_fixed,
                  std::shared_ptr<CvoPointCloudGPU> points_moving,
-                 float ell,
-                 perl_registration::cuKdTree<CvoPoint>::SharedPtr kdtree,
+                 Eigen::Matrix3f * ell_mat_gpu_inv,
+                 //perl_registration::cuKdTree<CvoPoint>::SharedPtr kdtree,
                  // output
                  SparseKernelMat * A_mat,
                  SparseKernelMat * A_mat_gpu
@@ -601,7 +616,7 @@ namespace cvo{
                                                                                          points_moving_raw,
                                                                                          points_moving->points.size(),
                                                                                          ind_device,
-                                                                                         ell,
+                                                                                         ell_mat_gpu_inv,
                                                                                          // output
                                                                                          A_mat_gpu // the kernel matrix!
                                                                                          );
@@ -609,6 +624,7 @@ namespace cvo{
     compute_nonzeros(A_mat);
   }
 
+/*
   __global__ void compute_flow_gpu(const CvoParams * cvo_params,
                                    float ell,
                                    CvoPoint * cloud_x, CvoPoint * cloud_y,
@@ -710,10 +726,10 @@ namespace cvo{
   partial_dl[i] += double((1/ell_3*(Axxi*sum_diff_xx_2).value()));    
     
   }
-
+*/
  
   __global__ void compute_flow_gpu_no_eigen(const CvoParams * cvo_params,
-                                            float ell,
+                                            Eigen::Matrix3f * ell_mat_inv,
                                             CvoPoint * cloud_x, CvoPoint * cloud_y,
                                             SparseKernelMat * A,
                                             /*float * cross_xy_all,
@@ -731,7 +747,7 @@ namespace cvo{
     if (i > A->rows - 1)
       return;
 
-    float ell_3 = (ell) * (ell) * (ell);
+    //float ell_3 = (ell) * (ell) * (ell);
 
     int A_rows = A->rows;
     int A_cols = A->cols;
@@ -882,7 +898,7 @@ namespace cvo{
   }
 
 
- 
+
   __global__ void compute_flow_gpu_no_eigen_with_kdtree(const CvoParams * cvo_params,
                                                         float ell,
                                                         CvoPoint * cloud_x, CvoPoint * cloud_y,
@@ -1133,8 +1149,8 @@ namespace cvo{
                             
     // compute SE kernel for Axy
     se_kernel(params_gpu, cvo_state->cloud_x_gpu, cvo_state->cloud_y_gpu ,
-              cvo_state->ell, 
-              cvo_state->kdtree_fixed_points,
+              cvo_state->ell_mat_gpu_inv, 
+              //cvo_state->kdtree_fixed_points,
               &cvo_state->A_host, cvo_state->A);
 
     // compute SE kernel for Axx and Ayy
@@ -1159,7 +1175,7 @@ namespace cvo{
 
     compute_flow_gpu_no_eigen<<<cvo_state->A_host.rows / CUDA_BLOCK_SIZE + 1 ,CUDA_BLOCK_SIZE>>>(params_gpu,
     //compute_flow_gpu_no_eigen_with_kdtree<<<cvo_state->A_host.rows / CUDA_BLOCK_SIZE + 1 ,CUDA_BLOCK_SIZE>>>(params_gpu,
-                                                                                        cvo_state->ell,
+                                                                                        cvo_state->ell_mat_gpu_inv,
                                                                                         thrust::raw_pointer_cast(cvo_state->cloud_x_gpu->points.data()   ),
                                                                                         thrust::raw_pointer_cast(cvo_state->cloud_y_gpu->points.data()   ),
                                                                                         cvo_state->A, 
@@ -1414,6 +1430,7 @@ namespace cvo{
     //params.MAX_ITER = 1;
     int iter = params.MAX_ITER;
     Eigen::Vector3f omega, v;
+    Eigen::Matrix3f ell_mat_inv;
 
     auto start_all = chrono::system_clock::now();
     auto start = chrono::system_clock::now();
@@ -1423,9 +1440,12 @@ namespace cvo{
 
     std::cout<<"Start iteration, init transform is \n";
     std::cout<<init_guess_transform<<std::endl;
+    std::cout<<"init ell mat is "<<cvo_state.ell_mat<<std::endl;
     for(int k=0; k<params.MAX_ITER; k++){
     //for(int k=0; k<2; k++){
-      if (debug_print) printf("new iteration %d, ell is %f\n", k, cvo_state.ell);
+      if (debug_print)  {
+        std::cout<<"new iteration "<< k << ", ell is "<<cvo_state.ell<< ", ell_mat is "<< cvo_state.ell_mat<<std::endl;
+      }
       cvo_state.reset_state_at_new_iter();
       if (debug_print) printf("just reset A mat\n");
       
@@ -1442,7 +1462,7 @@ namespace cvo{
         
       // compute omega and v
       start = chrono::system_clock::now();
-
+      if (debug_print) std::cout<<"compute_flow....\n";
       compute_flow(&cvo_state, params_gpu, &omega, &v);
       if (debug_print)std::cout<<"iter "<<k<< "omega: \n"<<omega.transpose()<<"\nv: \n"<<v.transpose()<<std::endl;
       end = std::chrono::system_clock::now();
@@ -1503,9 +1523,13 @@ namespace cvo{
       */
 
       if (k > 0 && cvo_state.ell > params.ell_min) {
-        if (k % 10 == 0 )
-        cvo_state.ell = cvo_state.ell * 0.9;
-
+        if (k % 10 == 0 ) {
+          cvo_state.ell = cvo_state.ell * 0.9;
+          
+          cvo_state.ell_mat = (cvo_state.ell_mat * 0.81).eval();
+          ell_mat_inv = (cvo_state.ell_mat.inverse() * 0.5).eval();
+          cudaMemcpy(cvo_state.ell_mat_gpu_inv, &ell_mat_inv, sizeof(Eigen::Matrix3f), cudaMemcpyHostToDevice  );
+        }
       }
       
 
@@ -1529,7 +1553,7 @@ namespace cvo{
     std::cout<<"t_compute_flow is "<<t_compute_flow.count()<<"\n";
     std::cout<<"t_compute_step is "<<t_compute_step.count()<<"\n"<<std::flush;
     std::cout<<"t_all is "<<t_all.count()<<"\n"<<std::flush;
-    std::cout<<"non adaptive cvo ends. final ell is "<<cvo_state.ell<<std::endl;
+    std::cout<<"non adaptive cvo ends. final ell is "<<cvo_state.ell<<", final ell mat is "<<cvo_state.ell_mat<<std::endl;
 
     if (registration_seconds)
       *registration_seconds = t_all.count();

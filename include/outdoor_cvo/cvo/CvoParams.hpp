@@ -32,7 +32,44 @@ namespace cvo {
     float eps_2;        // threshold for se3 distance
     float min_step;     // minimum step size for integration
     float step;         // integration step size
-    
+
+    float ell_x ;
+    float ell_y ;
+    float ell_z ;
+    /*
+    CvoParams& operator=(const CvoParams & other)
+    {
+      gpu_thread_num = other.gpu_thread_num;
+      kdtree_dist_threshold = other.kdtree_dist_threshold;
+      ell_init = other.ell_init;
+      ell_min = other.ell_min;
+      ell_max = other.ell_max;
+le dl;           // changes for ell in each iteration
+le dl_step;
+t sigma;        // kernel signal variance (set as std)      
+t sp_thres;     // kernel sparsification threshold       
+t c;            // so(3) inner product scale     
+t d;            // R^3 inner product scale
+t color_scale;  // color space inner product scale
+t c_ell;        // kernel characteristic length-scale for color kernel
+t c_sigma;      // kernel signal variance for color kernel
+t s_ell;        // length-scale for semantic labels
+t s_sigma;      // signal variance for semantic labels
+MAX_ITER;       // maximum number of iteration
+t eps;          // the program stops if norm(omega)+norm(v) < eps
+t eps_2;        // threshold for se3 distance
+t min_step;     // minimum step size for integration
+t step;         // integration step size
+
+t ell_x ;
+t ell_y ;
+t ell_z ;
+
+      return *this;
+
+          
+      
+      }*/
     
   };
 
@@ -61,6 +98,20 @@ namespace cvo {
         >> params->min_step
         >> params->eps
         >> params->eps_2;
+
+      if (f.peek() != EOF){
+
+        
+        f>> params->ell_x
+         >> params->ell_y
+         >> params->ell_z;
+        std::cout<<"Read ell matrix "<<params->ell_x<<", "<<params->ell_y<<", "<<params->ell_z<<std::endl;        
+        
+      }  else {
+        params->ell_x = params->ell_y = params->ell_z = 0.0;
+        
+      }
+      
       f.close();
     //fclose(ptr);
 
