@@ -13,6 +13,10 @@
 #include "utils/StaticStereo.hpp"
 #include "utils/CvoPixelSelector.hpp"
 #include "mapping/bkioctomap.h"
+#include <pcl/filters/voxel_grid.h>
+
+
+
 namespace cvo{
 
   static bool is_good_point(const Vec3f & xyz, const Vec2i uv, int h, int w ) {
@@ -472,6 +476,43 @@ namespace cvo{
     tbb::parallel_for(int(0), input.num_points(), [&](int j) {
         output.positions_[j] = (pose.block(0, 0, 3, 3) * input.positions()[j] + pose.block(0, 3, 3, 1)).eval();
       });
+  }
+
+  void CvoPointCloud::CvoPointCloud_to_pcl(const CvoPointCloud& cvo_cloud, pcl::PointCloud<CvoPoint>::Ptr out_cloud){
+    int num_points = cvo_cloud.num_points();
+    const ArrayVec3f & positions = cvo_cloud.positions();
+    const Eigen::Matrix<float, Eigen::Dynamic, FEATURE_DIMENSIONS> & features = cvo_cloud.features();
+    const Eigen::Matrix<float, Eigen::Dynamic, NUM_CLASSES> & labels = cvo_cloud.labels();
+    // set basic informations for pcl_cloud
+    pcl::PointCloud<CvoPoint> pcl_cloud;
+    pcl_cloud.points.resize(num_points);
+    pcl_cloud.width = num_points;
+    pcl_cloud.height = 1;
+    // loop through all points
+    for(int i=0; i<num_points; ++i){
+      // set positions
+      pcl_cloud.points[i].x = positions[i](0);
+      pcl_cloud.points[i].y = positions[i](1);
+      pcl_cloud.points[i].z = positions[i](2);
+      pcl_cloud.points[i].r = (uint8_t)std::min(255.0, (features(i,0) * 255.0));
+      pcl_cloud.points[i].g = (uint8_t)std::min(255.0, (features(i,1) * 255.0)) ;
+      pcl_cloud.points[i].b = (uint8_t)std::min(255.0, (features(i,2) * 255.0));
+      //memcpy(pcl_cloud[i].features, features.row(i).data(), FEATURE_DIMENSIONS * sizeof(float));
+      for (int j = 0; j < FEATURE_DIMENSIONS; j++)
+        pcl_cloud[i].features[j] = features(i,j);
+      labels.row(i).maxCoeff(&pcl_cloud.points[i].label);
+      ///memcpy(pcl_cloud[i].label_distribution, labels.row(i).data(), NUM_CLASSES * sizeof(float));
+      for (int j = 0; j < NUM_CLASSES; j++)
+        pcl_cloud[i].label_distribution[j] = labels(i,j);
+    }
+    
+
+    // pcl::VoxelGrid<CvoPoint> voxel_grid;
+    // voxel_grid.setInputCloud(pcl_cloud);
+    // voxel_grid.setLeafSize(0.1f, 0.1f, 0.1f);
+    // voxel_grid.filter(out_cloud);
+    // std::cout<<"before voxel filter "<<pcl_cloud.size()<<" points, after "<<out_cloud.size()<<std::endl;
+    
   }
 
 

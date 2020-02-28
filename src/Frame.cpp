@@ -8,6 +8,7 @@
 #include "utils/StaticStereo.hpp"
 #include "utils/Calibration.hpp"
 #include "utils/data_type.hpp"
+#include "utils/PointSegmentedDistribution.hpp"
 namespace cvo {
 
   Frame::Frame(int ind,
@@ -60,6 +61,10 @@ namespace cvo {
     pose_in_graph_.setIdentity();
     Eigen::Affine3f eye = Eigen::Affine3f::Identity();
     tracking_pose_from_last_keyframe_.set_relative_transform(ind, eye,1.0 );
+
+    // pcl::PointCloud<CvoPoint> out_cloud;
+    // points_.CvoPointCloud_to_pcl(points_, out_cloud);
+
     //points_.write_to_color_pcd(std::to_string(id)+".pcd");
     //points_.write_to_color_pcd(std::to_string(id)+"_label.pcd");
   }
@@ -81,6 +86,8 @@ namespace cvo {
     tracking_pose_from_last_keyframe_.set_relative_transform(ind, eye, 1.0 );
 
     // points_.write_to_intensity_pcd("lidar_pcd/" + std::to_string(ind)+".pcd");
+    // points_.write_to_intensity_pcd("/home/cel/PERL/datasets/kitti_dataset/sequences/06/cvo_points_pcd/" + std::to_string(ind)+".pcd");
+    // points_.write_to_txt("/home/cel/PERL/datasets/kitti_dataset/sequences/06/cvo_points/" +std::to_string(ind)+".txt");
   }
 
   Frame::Frame(int ind,
@@ -100,10 +107,13 @@ namespace cvo {
     Eigen::Affine3f eye = Eigen::Affine3f::Identity();
     tracking_pose_from_last_keyframe_.set_relative_transform(ind, eye, 1.0 );
 
+    // pcl::PointCloud<CvoPoint>::Ptr out_cloud (new pcl::PointCloud<CvoPoint>);
+    // points_.CvoPointCloud_to_pcl(points_, out_cloud);
+
     
-    // points_.write_to_intensity_pcd("/home/cel/PERL/datasets/kitti_dataset/sequences/01/cvo_points_pcd/" + std::to_string(ind)+".pcd");
-    // points_.write_to_label_pcd("/home/cel/PERL/datasets/kitti_dataset/sequences/01/cvo_points_label/" +std::to_string(ind)+".pcd");
-    // points_.write_to_txt("/home/cel/PERL/datasets/kitti_dataset/sequences/01/cvo_points/" +std::to_string(ind)+".txt");
+    // points_.write_to_intensity_pcd("/home/cel/PERL/datasets/kitti_dataset/sequences/07/cvo_points_pcd/" + std::to_string(ind)+".pcd");
+    // points_.write_to_label_pcd("/home/cel/PERL/datasets/kitti_dataset/sequences/07/cvo_points_label/" +std::to_string(ind)+".pcd");
+    // points_.write_to_txt("/home/cel/PERL/datasets/kitti_dataset/sequences/07/cvo_points/" +std::to_string(ind)+".txt");
     
   }
   

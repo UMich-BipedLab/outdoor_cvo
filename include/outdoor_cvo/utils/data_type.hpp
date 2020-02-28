@@ -19,6 +19,7 @@
 #include <opencv2/opencv.hpp>
 #include <tbb/concurrent_vector.h>
 #include <sophus/se3.hpp>
+#include "utils/PointSegmentedDistribution.hpp"
 //#include "util/settings.h"
 //#define PYR_LEVELS 3
 
@@ -161,6 +162,8 @@ namespace cvo{
   typedef std::vector<Eigen::Vector3f, Eigen::aligned_allocator<Eigen::Vector3f>> ArrayVec3f;
   typedef ArrayVec3f cloud_t;
   typedef Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatrixXf_row;
+
+  typedef pcl::PointSegmentedDistribution<5,19> CvoPoint;
   /*  
   struct frame{
 

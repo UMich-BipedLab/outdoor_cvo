@@ -15,7 +15,6 @@
 #include <pcl/point_cloud.h>
 //#include "mapping/bkioctomap.h"
 
-
 namespace semantic_bki {
   class SemanticBKIOctoMap;
 }
@@ -53,6 +52,8 @@ namespace cvo {
     static void transform(const Eigen::Matrix4f& pose,
                           const CvoPointCloud & input,
                           CvoPointCloud & output);
+    
+    void CvoPointCloud_to_pcl(const CvoPointCloud& cvo_cloud, pcl::PointCloud<CvoPoint>::Ptr out_cloud);
 
     // getters
     int num_points() const {return num_points_;}

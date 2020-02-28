@@ -343,7 +343,10 @@ namespace cvo{
 
 #ifdef IS_USING_SEMANTICS            
             Eigen::VectorXf label_b = cloud_b->labels().row(idx);
-            d2_semantic = ((label_a-label_b).squaredNorm());
+            // kernel method
+            // d2_semantic = ((label_a-label_b).squaredNorm()); 
+            // dot product method
+            d2_semantic = label_a.dot(label_b);
 #endif
             // std::cout<<"DEBUG-CVO: d2 = " << d2 << ", d2_color = " << d2_color << std::endl;
             if(d2_color<d2_c_thres){
@@ -352,7 +355,10 @@ namespace cvo{
               ck = c_sigma*c_sigma*exp(-d2_color/(2.0*c_ell*c_ell));
               // std::cout<<"DEBUG-CVO: ck=" << ck << std::endl;
 #ifdef IS_USING_SEMANTICS              
-              sk = s_sigma*s_sigma*exp(-d2_semantic/(2.0*s_ell*s_ell));
+              // kernel method
+              // sk = s_sigma*s_sigma*exp(-d2_semantic/(2.0*s_ell*s_ell)); 
+              // dot product method
+              sk = d2_semantic;
 #else
               sk = 1;
 #endif        
@@ -557,6 +563,7 @@ namespace cvo{
                                              int idx = it.col();
                                              Ayyi(0,j) = it.value();    // extract current value in A
                                              diff_yy.row(j) = ((*cloud_y)[idx]-(*cloud_y)[i]).transpose();
+                                             sum_diff_yy_2(j,0) = diff_yy.row(j).squaredNorm();
                                              ++j;
                                            }
                                            // update dl from Ayy
@@ -802,7 +809,7 @@ namespace cvo{
         break;
       }
 
-      ell = ell + dl_step*dl;
+      ell = ell - dl_step*dl;
       if(ell>=ell_max){
         ell = ell_max*0.7;
         ell_max = ell_max*0.7;

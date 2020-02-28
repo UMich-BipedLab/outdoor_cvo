@@ -30,7 +30,6 @@ int main(int argc, char *argv[]) {
     std::cout<<"num_classes: "<<num_class<<std::endl;
     use_semantic_str = "_semantic";
     use_semantic = true;
-    #define IS_USING_SEMANTICS
   }
   
   int mode = stoi(argv[1]); // 0 for online generate 1 for read txt
@@ -163,7 +162,7 @@ int main(int argc, char *argv[]) {
     }
     else{
       init_guess.setIdentity();
-      init_guess.matrix()(2,3)=-0.75;
+      // init_guess.matrix()(2,3)=-0.75;
     }
 
     std::cout<<"\n============================================="<<std::endl;
@@ -193,6 +192,11 @@ int main(int argc, char *argv[]) {
         auto& source_fr = source_frame->points(); // keyframe
         auto& target_fr = target_frame->points();
         cvo_align.set_pcd(source_fr, target_fr, init_guess, true);
+        if(i==start_frame+1){
+          cvo_align.ell = 0.95;
+          cvo_align.ell_max = 1;
+          std::cout<<"initialize ell to: "<< cvo_align.ell<<std::endl;
+        }
         cvo_align.align();
       }
       else if(data_type==1){
@@ -218,6 +222,11 @@ int main(int argc, char *argv[]) {
         auto& source_fr = pcl_source_frame->points(); // keyframe
         auto& target_fr = pcl_target_frame->points();
         cvo_align.set_pcd(source_fr, target_fr, init_guess, true);
+        if(i==start_frame+1){
+          cvo_align.ell = 0.95;
+          cvo_align.ell_max = 1;
+          std::cout<<"initialize ell to: "<< cvo_align.ell<<std::endl;
+        }
         cvo_align.align();
       }
         
@@ -234,6 +243,11 @@ int main(int argc, char *argv[]) {
       const cvo::CvoPointCloud &const_target_fr = target_fr;
       
       cvo_align.set_pcd(const_source_fr, const_target_fr, init_guess, true);
+      if(i==start_frame+1){
+        cvo_align.ell = 0.95;
+        cvo_align.ell_max = 1;
+        std::cout<<"initialize ell to: "<< cvo_align.ell<<std::endl;
+      }
       cvo_align.align();
     }
     
