@@ -275,6 +275,17 @@ namespace cvo{
       
     
   }
+  __device__
+  float diag_dist_before_exp(CvoPoint * pa, CvoPoint * pb, Eigen::Matrix3f * ell_mat_inv ) {
+
+    float d1 = pa->x - pb->x;
+    float d2 = pa->y - pb->y;
+    float d3 = pa->z - pb->z;
+
+    return  (*ell_mat_inv)(0,0) * d1 * d1 + (*ell_mat_inv)(1,1) * d2 * d2 + (*ell_mat_inv)(2,2) * d3 * d3; 
+      
+    
+  }
 
   __global__
   void fill_in_A_mat_gpu(const CvoParams * cvo_params,
@@ -300,7 +311,7 @@ namespace cvo{
     float c_sigma = cvo_params->c_sigma;
 
     // convert k threshold to d2 threshold (so that we only need to calculate k when needed)
-    //float d2_thres = -2.0*l*l*log(sp_thres/s2);
+    float d2_thres = -log(sp_thres/s2);
     float d2_c_thres = -2.0*c_ell*c_ell*log(sp_thres/c_sigma/c_sigma);
 
     //Eigen::VectorXf feature_a = feature_a_gpu->row(i).transpose();
@@ -328,7 +339,8 @@ namespace cvo{
       // d2 = (x-y)^2
       CvoPoint * p_b = &points_b[ind_b];
       //float d2 = (squared_dist( *p_b ,*p_a ));
-      float k = s2 * se_dist(p_a, p_b, ell_mat_inv);
+      float d2 = diag_dist_before_exp(p_a, p_b, ell_mat_inv);
+      //float k = s2 * se_dist(p_a, p_b, ell_mat_inv);
       /*
       if ( i == 1000 && j== 1074) {
         CvoPoint * pb = points_b + j;
@@ -337,10 +349,11 @@ namespace cvo{
                pb->x, pb->y,  pb->z );
                }*/
       
-      //if(d2<d2_thres  ){
-      if(k>sp_thres  ){
+      if(d2<d2_thres  ){
+        //if(k>sp_thres  ){
 #ifdef IS_GEOMETRIC_ONLY
-        float a = k;
+
+        float a = s2*exp(-d2);
         if (a > cvo_params->sp_thres){
           A_mat->mat[i * A_mat->cols + num_inds] = a;
           A_mat->ind_row2col[i * A_mat->cols + num_inds] = ind_b;
@@ -376,7 +389,7 @@ namespace cvo{
           //#else
         
           
-          //float k = s2*exp(-d2/(2.0*l*l));
+          float k = s2*exp(-d2);
           float ck = c_sigma*c_sigma*exp(-d2_color/(2.0*c_ell*c_ell));
 #ifdef IS_USING_SEMANTICS              
           float sk = cvo_params->s_sigma*cvo_params->s_sigma*exp(-d2_semantic/(2.0*s_ell*s_ell));
@@ -1523,10 +1536,12 @@ namespace cvo{
       */
 
       if (k > 0 && cvo_state.ell > params.ell_min) {
-        if (k % 10 == 0 ) {
+        if (k %10 == 0 ) {
           cvo_state.ell = cvo_state.ell * 0.9;
-          
           cvo_state.ell_mat = (cvo_state.ell_mat * 0.81).eval();
+          for ( int i = 0 ; i < 3; i++)
+            if (cvo_state.ell_mat(i,i) < params.ell_min * params.ell_min)
+              cvo_state.ell_mat(i,i)= params.ell_min * params.ell_min;
           ell_mat_inv = (cvo_state.ell_mat.inverse() * 0.5).eval();
           cudaMemcpy(cvo_state.ell_mat_gpu_inv, &ell_mat_inv, sizeof(Eigen::Matrix3f), cudaMemcpyHostToDevice  );
         }
