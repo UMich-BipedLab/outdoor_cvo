@@ -514,7 +514,7 @@ namespace cvo
 
       if( 
            (depth_grad_horizontal > depth_bound_horizontal) // for lyft dataset 
-          //  ((intenstity_grad > intensity_bound) || (depth_grad_horizontal > depth_bound_horizontal) || (depth_grad_vertical > depth_bound_vertical)) // for kitti dataset
+          //  ((intenstity_grad > intensity_bound) || (depth_grad_horizontal > depth_bound_horizontal)) // for kitti dataset
            && ((point.x!=0.0) && (point.y!=0.0) && (point.z!=0.0))
           //  && (point.intensity > 0)
            && (distance < distance_bound)){
