@@ -117,7 +117,7 @@ int main(int argc, char *argv[]) {
   int i = 0;
   for ( auto &f: files) {
     std::cout << "Reading " << f << std::endl;
-    pc_vec[i].read_cvo_pointcloud_from_file(f);
+    pc_vec[i].read_cvo_pointcloud_from_file(f, 5);
     
     // transform point cloud
     Eigen::Matrix4f transform = get_current_pose(camera_poses, i);

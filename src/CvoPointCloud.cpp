@@ -5,14 +5,16 @@
 #include <cstdio>
 #include <iostream>
 #include <algorithm>
-
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 #include <pcl/io/pcd_io.h>
+#include <tbb/tbb.h>
 #include "utils/CvoPointCloud.hpp"
 #include "utils/StaticStereo.hpp"
 #include "utils/CvoPixelSelector.hpp"
+#include "utils/LidarPointSelector.hpp"
 #include "mapping/bkioctomap.h"
+
 namespace cvo{
 
   static bool is_good_point(const Vec3f & xyz, const Vec2i uv, int h, int w ) {
@@ -144,9 +146,6 @@ namespace cvo{
                   expected_points,
                   output_uv);
 
-
-
-
     std::vector<int> good_point_ind;
     int h = left_image.color().rows;
     int w = left_image.color().cols;
@@ -210,16 +209,34 @@ namespace cvo{
     //  write_to_label_pcd("labeled_input.pcd");
   }
 
-  CvoPointCloud::CvoPointCloud(pcl::PointCloud<pcl::PointXYZI>::Ptr pc) {
-    int expected_points = 5000;
+  CvoPointCloud::CvoPointCloud(pcl::PointCloud<pcl::PointXYZI>::Ptr pc, int target_num_points, int beam_num) {
+    int expected_points = target_num_points;
     double intensity_bound = 0.4;
-    double depth_bound = 4.0;
-    double distance_bound = 55.0;
-    pcl::PointCloud<pcl::PointXYZI>::Ptr pc_out (new pcl::PointCloud<pcl::PointXYZI>);
+    double depth_bound = 3.0;
+    double distance_bound = 40.0;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr pc_out (new pcl::PointCloud<pcl::PointXYZI>);    
     std::vector <double> output_depth_grad;
     std::vector <double> output_intenstity_grad;
-    edge_detection(pc, expected_points, intensity_bound, depth_bound, distance_bound, pc_out, output_depth_grad, output_intenstity_grad);
-     
+    std::vector <float> edge_or_surface;
+    LidarPointSelector lps(expected_points, intensity_bound, depth_bound, distance_bound, beam_num);
+
+    // running edge detection by its own
+    // lps.edge_detection(pc, pc_out, output_depth_grad, output_intenstity_grad);
+
+    // running loam edge detection by its own
+    // lps.loam_point_selector(pc, pc_out, edge_or_surface);
+
+    // running lego loam point selection by its own
+    lps.legoloam_point_selector(pc, pc_out, edge_or_surface);
+
+    // ruunning edge detection + lego loam point selection
+    // pcl::PointCloud<pcl::PointXYZI>::Ptr pc_out_edge (new pcl::PointCloud<pcl::PointXYZI>);
+    // pcl::PointCloud<pcl::PointXYZI>::Ptr pc_out_surface (new pcl::PointCloud<pcl::PointXYZI>);
+    // lps.edge_detection(pc, pc_out_edge, output_depth_grad, output_intenstity_grad);    
+    // lps.legoloam_point_selector(pc, pc_out_surface, edge_or_surface);    
+    // *pc_out += *pc_out_edge;
+    // *pc_out += *pc_out_surface;
+    
     // fill in class members
     num_points_ = pc_out->size();
     num_classes_ = 0;
@@ -232,29 +249,42 @@ namespace cvo{
       Vec3f xyz;
       xyz << pc_out->points[i].x, pc_out->points[i].y, pc_out->points[i].z;
       positions_.push_back(xyz);
-      features_(i, 0) = pc_out->points[i].intensity;      
+      features_(i, 0) = pc_out->points[i].intensity;
+      // if (edge_or_surface[i] == 0){
+      //   types_(i, 0) = 1;
+      //   types_(i, 1) = 0;
+      // }
+      // else if (edge_or_surface[i] == 1){
+      //   types_(i, 0) = 0;
+      //   types_(i, 1) = 1;
+      // }
     }
 
     // write_to_intensity_pcd("kitti_lidar.pcd");
   }
 
-  CvoPointCloud::CvoPointCloud(pcl::PointCloud<pcl::PointXYZI>::Ptr pc, const std::vector<int> & semantic) {
-    int expected_points = 5000;
+  CvoPointCloud::CvoPointCloud(pcl::PointCloud<pcl::PointXYZI>::Ptr pc, const std::vector<int> & semantic ,
+                               int num_classes,  int target_num_points , int beam_num) {
+    int expected_points = target_num_points;
     double intensity_bound = 0.4;
-    double depth_bound = 4.0;
-    double distance_bound = 55.0;
+    double depth_bound = 3.0;
+    double distance_bound = 40.0;
     pcl::PointCloud<pcl::PointXYZI>::Ptr pc_out (new pcl::PointCloud<pcl::PointXYZI>);
     std::vector <double> output_depth_grad;
     std::vector <double> output_intenstity_grad;
     std::vector <int> semantic_out;
-    edge_detection(pc, semantic, expected_points, intensity_bound, depth_bound, distance_bound, pc_out, output_depth_grad, output_intenstity_grad, semantic_out);
+    LidarPointSelector lps(expected_points, intensity_bound, depth_bound, distance_bound, beam_num);
+    lps.edge_detection(pc, semantic, pc_out, output_depth_grad, output_intenstity_grad, semantic_out);
+
     // fill in class members
     num_points_ = pc_out->size();
-    num_classes_ = 19; //TODO: get it from input
-
+    num_classes_ = num_classes; //TODO: get it from input
+    
     feature_dimensions_ = 1;
     features_.resize(num_points_, feature_dimensions_);
     labels_.resize(num_points_, num_classes_);
+
+    std::cout<<"Construct CvoPointCloud with "<<num_points_<<" points  from "<<pc->size()<<" points\n";
 
     for (int i = 0; i < num_points_ ; i++) {
       Vec3f xyz;
@@ -272,7 +302,7 @@ namespace cvo{
       labels_.row(i).maxCoeff(&max_class);
     }
   }
-  
+
   CvoPointCloud::CvoPointCloud(const semantic_bki::SemanticBKIOctoMap * map,
                                const int num_classes) {
     num_classes_ = num_classes;
@@ -331,15 +361,16 @@ namespace cvo{
     //std::cout<< features_.row(0)<<"\n"<<features_.row(num_points_-1)<<"\n";
   }
 
+
   CvoPointCloud::CvoPointCloud(){}
   CvoPointCloud::~CvoPointCloud() {
     
     
   }
 
-  int CvoPointCloud::read_cvo_pointcloud_from_file(const std::string & filename) {
+  int CvoPointCloud::read_cvo_pointcloud_from_file(const std::string & filename, int feature_dim) {
     std::ifstream infile(filename);
-    feature_dimensions_ = 5;
+    feature_dimensions_ = feature_dim;
     if (infile.is_open()) {
       infile>> num_points_;
       infile>> num_classes_;

@@ -33,11 +33,20 @@ namespace cvo {
     CvoPointCloud(const RawImage & left_raw_image,
                   const cv::Mat & right_image,
                   const Calibration &calib);
-    
-    CvoPointCloud(pcl::PointCloud<pcl::PointXYZI>::Ptr pc);
 
+    CvoPointCloud(pcl::PointCloud<pcl::PointXYZI>::Ptr pc,
+                  int target_num_points = 5000,
+                  int beam_num=64);
     CvoPointCloud(pcl::PointCloud<pcl::PointXYZI>::Ptr pc, 
-                  const std::vector<int> & semantics);
+                  const std::vector<int> & semantics,
+                  int num_classes=19,
+                  int target_num_points = 5000,
+                  int beam_num =64);
+    
+    // CvoPointCloud(pcl::PointCloud<pcl::PointXYZI>::Ptr pc);
+
+    // CvoPointCloud(pcl::PointCloud<pcl::PointXYZI>::Ptr pc, 
+    //               const std::vector<int> & semantics);
 
     CvoPointCloud(const semantic_bki::SemanticBKIOctoMap * map,
                   int num_semantic_class);
@@ -48,7 +57,7 @@ namespace cvo {
     
     ~CvoPointCloud();
 
-    int read_cvo_pointcloud_from_file(const std::string & filename);
+    int read_cvo_pointcloud_from_file(const std::string & filename, int feature_dim);
     
     static void transform(const Eigen::Matrix4f& pose,
                           const CvoPointCloud & input,

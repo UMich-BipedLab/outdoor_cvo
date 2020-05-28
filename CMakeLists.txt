@@ -14,6 +14,10 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -O3 -msse  -msse2 -msse3 -mss
 
 #set(BUILD_TYPE RelWithDebInfo)
 
+# Set target C++ standard and required compiler features
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 set(EXECUTABLE_OUTPUT_PATH bin)
 set(LIBRARY_OUTPUT_PATH lib)
 LIST(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
@@ -66,6 +70,9 @@ set(CVO_LIB_SOURCE
   ${PROJECT_SOURCE_DIR}/src/PoseGraph.cpp
   ${PROJECT_SOURCE_DIR}/src/StaticStereo.cpp
   ${PROJECT_SOURCE_DIR}/src/CvoPixelSelector.cpp
+  ${PROJECT_SOURCE_DIR}/src/LidarPointSelector.cpp
+  ${PROJECT_SOURCE_DIR}/src/LoamScanRegistration.cpp
+  ${PROJECT_SOURCE_DIR}/src/LeGoLoamPointSelection.cpp
   ${PROJECT_SOURCE_DIR}/src/RawImage.cpp
   ${PROJECT_SOURCE_DIR}/src/mapping/bkiblock.cpp
   ${PROJECT_SOURCE_DIR}/src/mapping/bkioctomap.cpp

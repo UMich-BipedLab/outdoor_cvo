@@ -260,8 +260,8 @@ int main(int argc, char *argv[]) {
       // std::cout<<"reading "<<files[cur_kf]<<std::endl;
       cvo::CvoPointCloud source_fr;
       cvo::CvoPointCloud target_fr;
-      source_fr.read_cvo_pointcloud_from_file(files[i-1+start_frame]);
-      target_fr.read_cvo_pointcloud_from_file(files[i+start_frame]);
+      source_fr.read_cvo_pointcloud_from_file(files[i-1+start_frame], 5);
+      target_fr.read_cvo_pointcloud_from_file(files[i+start_frame], 5);
       const cvo::CvoPointCloud &const_source_fr = source_fr;
       const cvo::CvoPointCloud &const_target_fr = target_fr;
       
