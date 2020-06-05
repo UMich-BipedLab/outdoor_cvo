@@ -1324,6 +1324,10 @@ namespace cvo{
                     const Eigen::Matrix4f & init_guess_transform,
                     Eigen::Ref<Eigen::Matrix4f> transform,
                     double *registration_seconds) const {
+    
+    // a flag of whether using indicator
+    bool using_indicator = true;
+    bool detect_indicator_drop = false;
 
     std::ofstream ell_file("ell_history1.txt");
     std::ofstream dist_change_file("dist_change_history1.txt");
@@ -1357,6 +1361,8 @@ namespace cvo{
     chrono::duration<double> t_compute_step = chrono::duration<double>::zero();
     std::cout<<"Start iteration, init transform is \n";
     std::cout<<init_guess_transform<<std::endl;
+    
+    // initialization for indicator
     std::queue<float> indicator_start_queue;
     std::queue<float> indicator_end_queue;
     float indicator_start_sum = 0;
@@ -1405,98 +1411,101 @@ namespace cvo{
       t_compute_flow += (end - start);
 
       // compute indicator and change lenthscale if needed
-      float indicator = (double)cvo_state.A_host.nonzero_sum / (double)source_points.num_points() / (double) target_points.num_points();
-      // decrease or increase lengthscale using indicator
+      if(using_indicator){
+        float indicator = (double)cvo_state.A_host.nonzero_sum / (double)source_points.num_points() / (double) target_points.num_points();
+        // decrease or increase lengthscale using indicator
 
-      // start queue is not full yet
-      if(indicator_start_queue.size() < 5){
-        // add current indicator to the start queue
-        indicator_start_queue.push(indicator);
-        // compute sum
-        indicator_start_sum += indicator;
-      }
-      // start queue is full, start building the end queue
-      else{
-        if(indicator_end_queue.size() < 5){
-          // add current indicator to the end queue and compute sum
-          indicator_end_queue.push(indicator);
-          indicator_end_sum += indicator;
+        // start queue is not full yet
+        if(indicator_start_queue.size() < 10){
+          // add current indicator to the start queue
+          indicator_start_queue.push(indicator);
+          // compute sum
+          indicator_start_sum += indicator;
         }
+        // start queue is full, start building the end queue
         else{
-          // check if criteria for decreasing legnthscale is satisfied
-          if(indicator_end_sum / indicator_start_sum >= 1.0){
-            decrease = true;
-            std::queue<float> empty;
-            std::swap( indicator_start_queue, empty );
-            std::queue<float> empty2;
-            std::swap( indicator_end_queue, empty2 );
-            indicator_start_sum = 0;
-            indicator_end_sum = 0;
-          }
-          // check if criteria for increasing legnthscale is satisfied
-          else if(indicator_end_sum / indicator_start_sum < 0.7){
-            increase = true;
-            std::queue<float> empty;
-            std::swap( indicator_start_queue, empty );
-            std::queue<float> empty2;
-            std::swap( indicator_end_queue, empty2 );
-            indicator_start_sum = 0;
-            indicator_end_sum = 0;
-          }
-          else{
-            // move the first indicator in the end queue to the start queue 
-            indicator_end_sum -= indicator_end_queue.front();
-            indicator_start_sum += indicator_end_queue.front();
-            indicator_start_queue.push(indicator_end_queue.front());
-            indicator_end_queue.pop();
-            indicator_start_sum -= indicator_start_queue.front();
-            indicator_start_queue.pop();
+          if(indicator_end_queue.size() < 10){
             // add current indicator to the end queue and compute sum
             indicator_end_queue.push(indicator);
             indicator_end_sum += indicator;
           }
+          else{
+            // check if criteria for decreasing legnthscale is satisfied
+            if(abs(1-indicator_end_sum/indicator_start_sum) < 0.01){
+              decrease = true;
+              std::queue<float> empty;
+              std::swap( indicator_start_queue, empty );
+              std::queue<float> empty2;
+              std::swap( indicator_end_queue, empty2 );
+              indicator_start_sum = 0;
+              indicator_end_sum = 0;
+            }
+            // check if criteria for increasing legnthscale is satisfied
+            else if(indicator_end_sum / indicator_start_sum < 0.7){
+              increase = true;
+              std::queue<float> empty;
+              std::swap( indicator_start_queue, empty );
+              std::queue<float> empty2;
+              std::swap( indicator_end_queue, empty2 );
+              indicator_start_sum = 0;
+              indicator_end_sum = 0;
+            }
+            else{
+              // move the first indicator in the end queue to the start queue 
+              indicator_end_sum -= indicator_end_queue.front();
+              indicator_start_sum += indicator_end_queue.front();
+              indicator_start_queue.push(indicator_end_queue.front());
+              indicator_end_queue.pop();
+              indicator_start_sum -= indicator_start_queue.front();
+              indicator_start_queue.pop();
+              // add current indicator to the end queue and compute sum
+              indicator_end_queue.push(indicator);
+              indicator_end_sum += indicator;
+            }
+          }
+        }
+
+        // detect indicator drop and skip iteration
+        if (detect_indicator_drop){
+          if((last_indicator - indicator) / last_indicator > 0.2){
+            // suddenly drop
+            if(last_decrease){
+              // drop because of decreasing lenthscale, keep track of the last indicator
+              last_indicator = indicator;
+            }
+            else{
+              // increase lengthscale and skip iteration
+              increase = true;
+              skip_iteration = true;
+            }
+          }
+          else{
+            // nothing bad happened, keep track of the last indicator
+            last_indicator = indicator;
+          }
+        }
+
+        // DEBUG
+        // std::cout << "indicator=" << indicator << ", start size=" << indicator_start_queue.size() << ", sum=" << indicator_start_sum \
+        // << ", end size=" << indicator_end_queue.size() << ", sum=" << indicator_end_sum << std::endl;
+
+        if(decrease && cvo_state.ell > params.ell_min){
+          cvo_state.ell = cvo_state.ell * 0.9;
+          last_decrease = true;
+          decrease = false;
+        }
+        else if(~decrease && last_decrease){
+          last_decrease = false;
+        }
+        if(increase && cvo_state.ell < params.ell_max){
+          cvo_state.ell = cvo_state.ell * 1.1;
+          increase = false;
+        }
+
+        if(skip_iteration){
+          continue;
         }
       }
-
-      // detect indicator drop and skip iteration
-      if((last_indicator - indicator) / last_indicator > 0.2){
-        // suddenly drop
-        if(last_decrease){
-          // drop because of decreasing lenthscale, keep track of the last indicator
-          last_indicator = indicator;
-        }
-        else{
-          // increase lengthscale and skip iteration
-          increase = true;
-          skip_iteration = true;
-        }
-      }
-      else{
-        // nothing bad happened, keep track of the last indicator
-        last_indicator = indicator;
-      }
-
-      // DEBUG
-      // std::cout << "indicator=" << indicator << ", start size=" << indicator_start_queue.size() << ", sum=" << indicator_start_sum \
-      // << ", end size=" << indicator_end_queue.size() << ", sum=" << indicator_end_sum << std::endl;
-      
-      if(decrease && cvo_state.ell > params.ell_min){
-        cvo_state.ell = cvo_state.ell * 0.9;
-        last_decrease = true;
-        decrease = false;
-      }
-      else if(~decrease && last_decrease){
-        last_decrease = false;
-      }
-      if(increase && cvo_state.ell < params.ell_max){
-        cvo_state.ell = cvo_state.ell * 1.1;
-        increase = false;
-      }
-
-      if(skip_iteration){
-        continue;
-      }
-
 
       // compute step size for integrating the flow
       start = chrono::system_clock::now();
@@ -1554,14 +1563,13 @@ namespace cvo{
       }
       cvo_state.ell = (cvo_state.ell<params.ell_min)? params.ell_min:cvo_state.ell;
       */
-
-      /*
-      // exponential decay length scale
-      if (k > 0 && cvo_state.ell > params.ell_min) {
-        if (k % 30 == 0 )
-        cvo_state.ell = cvo_state.ell * 0.9;
+      if(!using_indicator){
+        // exponential decay length scale
+        if (k > 0 && cvo_state.ell > params.ell_min) {
+          if (k % 30 == 0 )
+          cvo_state.ell = cvo_state.ell * 0.9;
+        }
       }
-      */
       
       if(debug_print) printf("end of iteration \n\n\n");
       
