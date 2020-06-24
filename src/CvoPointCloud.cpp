@@ -222,11 +222,11 @@ namespace cvo{
     double depth_bound = 4.0;
     double distance_bound = 55.0;
     pcl::PointCloud<pcl::PointXYZI>::Ptr pc_out (new pcl::PointCloud<pcl::PointXYZI>);
-    pcl::PointCloud<pcl::Normal>::Ptr normals_out (new pcl::PointCloud<pcl::Normal>);
+    pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr curv_out (new pcl::PointCloud<pcl::PrincipalCurvatures> ());
     std::vector <double> output_depth_grad;
     std::vector <double> output_intenstity_grad;
     edge_detection(pc, expected_points, intensity_bound, depth_bound, distance_bound, pc_out,\
-                   output_depth_grad, output_intenstity_grad, normals_out);
+                   output_depth_grad, output_intenstity_grad, curv_out);
      
     
     /*
@@ -258,16 +258,15 @@ namespace cvo{
     // features_ = Eigen::MatrixXf::Zero(num_points_, 1);
     feature_dimensions_ = 1;
     features_.resize(num_points_, feature_dimensions_);
-    normals_.resize(num_points_,3);
+    curvatures_.resize(num_points_,2);
 
     for (int i = 0; i < num_points_ ; i++) {
       Vec3f xyz;
       xyz << pc_out->points[i].x, pc_out->points[i].y, pc_out->points[i].z;
       positions_.push_back(xyz);
       features_(i, 0) = pc_out->points[i].intensity;      
-      normals_(i,0) = normals_out->points[i].normal_x;
-      normals_(i,1) = normals_out->points[i].normal_y;
-      normals_(i,2) = normals_out->points[i].normal_z;
+      curvatures_(i,0) = curv_out->points[i].pc1;
+      curvatures_(i,1) = curv_out->points[i].pc2;
     }
 
     // std::cout<<normals_<<std::endl;

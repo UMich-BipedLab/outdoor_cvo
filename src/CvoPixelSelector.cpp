@@ -34,7 +34,7 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pcl/visualization/cloud_viewer.h>
-
+#include <pcl/features/principal_curvatures.h>
 #include "utils/CvoPixelSelector.hpp"
 
 
@@ -460,7 +460,7 @@ namespace cvo
                      pcl::PointCloud<pcl::PointXYZI>::Ptr pc_out,
                      std::vector <double> & output_depth_grad,
                      std::vector <double> & output_intenstity_grad,
-                     pcl::PointCloud<pcl::Normal>::Ptr normals_out) {
+                     pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr curv_out) {
 
     int beam_num = 64;
     std::vector<int> indices;
@@ -483,6 +483,30 @@ namespace cvo
       // ne.setKSearch(30);
       // ne.setInputCloud(pc_in);
       ne.compute(*normals);
+
+      // Setup the principal curvatures computation
+      pcl::PrincipalCurvaturesEstimation<pcl::PointXYZI, pcl::Normal, pcl::PrincipalCurvatures> principalCurvaturesEstimation;
+
+      // Provide the original point cloud (without normals)
+      principalCurvaturesEstimation.setInputCloud(pc_in);
+
+      // Provide the point cloud with normals
+      principalCurvaturesEstimation.setInputNormals(normals);
+
+      // Use the same KdTree from the normal estimation
+      principalCurvaturesEstimation.setSearchMethod (tree);
+      principalCurvaturesEstimation.setRadiusSearch(1.0);
+
+      // Actually compute the principal curvatures
+      pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr principalCurvatures (new pcl::PointCloud<pcl::PrincipalCurvatures> ());
+      principalCurvaturesEstimation.compute (*principalCurvatures);
+
+      std::cout << "output points.size (): " << principalCurvatures->points.size () << std::endl;
+
+      // Display and retrieve the shape context descriptor vector for the 0th point.
+      std::cout<<"descriptor: "<<std::endl;
+      pcl::PrincipalCurvatures descriptor = principalCurvatures->points[0];
+      std::cout << descriptor << std::endl;
 
       /*
         ----------visualize normals----------
@@ -522,12 +546,13 @@ namespace cvo
       if( (intenstity_grad > intensity_bound || depth_grad > depth_bound) 
            && (point.intensity > 0.0 && !isnan(normals->points[i].normal_x)) 
            && ((point.x!=0.0) && (point.y!=0.0) && (point.z!=0.0)) //){
-           && (sqrt(point.x*point.x+point.y*point.y+point.z*point.z) < distance_bound)){
+           && (sqrt(point.x*point.x+point.y*point.y+point.z*point.z) < distance_bound)
+           && !isnan(principalCurvatures->points[i].pc1)){
           // std::cout << "points: " << point.x << ", " << point.y << ", " << point.z << ", " << point.intensity << std::endl;
           pc_out->push_back(pc_in->points[i]);
           output_depth_grad.push_back(depth_grad);
           output_intenstity_grad.push_back(intenstity_grad);
-          normals_out->push_back(normals->points[i]);
+          curv_out->push_back(principalCurvatures->points[i]);
       }
 
       previous_quadrant = quadrant;      

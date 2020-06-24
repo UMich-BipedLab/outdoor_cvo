@@ -50,7 +50,7 @@ namespace cvo
                      pcl::PointCloud<pcl::PointXYZI>::Ptr pc_out,
                      std::vector <double> & output_depth_grad,
                      std::vector <double> & output_intenstity_grad,
-                     pcl::PointCloud<pcl::Normal>::Ptr normals_out);
+                     pcl::PointCloud<pcl::PrincipalCurvatures>::Ptr curv_out);
   void edge_detection(pcl::PointCloud<pcl::PointXYZI>::Ptr pc_in,
                      const std::vector<int> & semantic_in,
                      int num_want,

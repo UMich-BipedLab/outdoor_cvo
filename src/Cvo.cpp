@@ -373,7 +373,7 @@ namespace cvo{
 
         Eigen::Matrix<float,Eigen::Dynamic,1> feature_a = cloud_a->features().row(i).transpose();
 
-        Eigen::Matrix<float,Eigen::Dynamic,1> normal_a = cloud_a->normals().row(i).transpose();
+        Eigen::Matrix<float,Eigen::Dynamic,1> curvature_a = cloud_a->curvatures().row(i).transpose();
 
 #ifdef IS_USING_SEMANTICS        
         Eigen::VectorXf label_a = cloud_a->labels().row(i);
@@ -388,14 +388,16 @@ namespace cvo{
           float nk = 1;
           float sk = 1;
           float d2_color = 0;
-          float d2_normal = 0;
+          float d2_curvature = 0;
           float d2_semantic = 0;
           float a = 0;
           if(d2<d2_thres){
             Eigen::Matrix<float,Eigen::Dynamic,1> feature_b = cloud_b->features().row(idx).transpose();
-            Eigen::Matrix<float,Eigen::Dynamic,1> normal_b = cloud_b->normals().row(idx).transpose();
+            Eigen::Matrix<float,Eigen::Dynamic,1> curvature_b = cloud_b->curvatures().row(idx).transpose();
             d2_color = ((feature_a-feature_b).squaredNorm());
-            // d2_normal = ((normal_a-normal_b).squaredNorm());
+            // std::cout<<"curvature_a: "<<curvature_a<<std::endl;
+            // std::cout<<"curvature_b: "<<curvature_b<<std::endl;
+            d2_curvature = ((curvature_a-curvature_b).squaredNorm());
 #ifdef IS_USING_SEMANTICS            
             Eigen::VectorXf label_b = cloud_b->labels().row(idx);
             d2_semantic = ((label_a-label_b).squaredNorm());
@@ -404,8 +406,8 @@ namespace cvo{
             if(d2_color<d2_c_thres){
               k = s2*exp(-d2/(2.0*l*l));
               ck = c_sigma*c_sigma*exp(-d2_color/(2.0*c_ell*c_ell));
-              // nk = n_sigma*n_sigma*exp(-d2_normal/(2.0*n_ell*n_ell));
-              nk = abs(n_sigma*n_sigma*normal_a.dot(normal_b));
+              nk = n_sigma*n_sigma*exp(-d2_curvature/(2.0*n_ell*n_ell));
+              // nk = abs(n_sigma*n_sigma*normal_a.dot(normal_b));
               // ck = 0.6;
 #ifdef IS_USING_SEMANTICS              
               sk = s_sigma*s_sigma*exp(-d2_semantic/(2.0*s_ell*s_ell));
