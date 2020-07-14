@@ -19,6 +19,9 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 #set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 #set (CMAKE_POSITION_INDEPENDENT_CODE FALSE)
 add_compile_options(-std=c++14)
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# list(APPEND CUDA_NVCC_FLAGS "--compiler-options -fPIC")
 # Release Mode
 set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -O3 -msse  -msse2 -msse3 -msse4 -mavx2 -ftree-vectorize" )
@@ -80,13 +83,18 @@ find_package(CUDA)
 #set (CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -std=c++14; -Xcompiler -fPIC; -rdc=true; -Wno-deprecated-gpu-targets; -lgsl; -lgslcblas; -lm; -O2; -use_fast_math; --extended-lambda; -gencode arch=compute_75,code=sm_75;)
 #list(APPEND CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS}  "-Xcompiler -std=c++14  -O3 -rdc=true -Wno-deprecated-gpu-targets -lgsl -lgslcblas -lm -use_fast_math"  )
 #list(APPEND CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "-ccbin g++-8 --extended-lambda -gencode arch=compute_75,code=sm_75" )
-set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS}  --extended-lambda  -gencode arch=compute_61,code=sm_61"  )
+set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS}  --expt-extended-lambda  -gencode arch=compute_61,code=sm_61"  )
 foreach(flag IN LISTS " -rdc=true; -Wno-deprecated-gpu-targets; -lgsl; -lgslcblas; -lm; -use_fast_math"  )
   add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=${flag}>")
 endforeach()
 
 #set (CUDA_NVCC_FLAGS "${CMAKE_CUDA_FLAGS}  --extended-lambda  -gencode arch=compute_75,code=sm_75"  )
 #set (CMAKE_CUDA_FLAGS "  --extended-lambda  -gencode arch=compute_75,code=sm_75"  )
+
+get_property(core_options TARGET Qt5::Core PROPERTY INTERFACE_COMPILE_OPTIONS)
+string(REPLACE "-fPIC" "" new_core_options ${core_options})
+set_property(TARGET Qt5::Core PROPERTY INTERFACE_COMPILE_OPTIONS ${new_core_options})
+set_property(TARGET Qt5::Core PROPERTY INTERFACE_POSITION_INDEPENDENT_CODE "ON")
 
 # thirdparty elas
 set(ELAS_LIB_SOURCE
@@ -181,15 +189,15 @@ add_library(lie_group_utils SHARED ${LIE_GROUP_SOURCE})
 
 add_library(cvo_utils_lib SHARED ${CVO_UTILS_SOURCE})
 
-target_link_libraries(cvo_utils_lib opencv_core opencv_photo opencv_highgui elas opencv_imgcodecs pcl_filters pcl_features pcl_io pcl_search ${TBB_LIBRARIES})
+target_link_libraries(cvo_utils_lib opencv_core opencv_photo opencv_highgui elas opencv_imgcodecs pcl_filters pcl_io pcl_features ${TBB_LIBRARIES})
 
 add_library(cvo_utils_normal_lib SHARED ${CVO_UTILS_SOURCE})
 target_compile_definitions(cvo_utils_normal_lib PRIVATE -DIS_USING_NORMALS )
-target_link_libraries(cvo_utils_normal_lib  opencv_core opencv_highgui opencv_photo elas opencv_imgcodecs pcl_filters pcl_features  pcl_io ${TBB_LIBRARIES})
+target_link_libraries(cvo_utils_normal_lib  opencv_core opencv_highgui opencv_photo elas opencv_imgcodecs pcl_filters pcl_features pcl_io ${TBB_LIBRARIES})
 
 add_library(cvo_utils_loam_lib SHARED ${CVO_UTILS_SOURCE})
-target_compile_definitions(cvo_utils_loam_lib PRIVATE -DIS_USING_LOAM -DIS_USING_NORMALS)
-target_link_libraries(cvo_utils_loam_lib  opencv_core opencv_highgui opencv_photo elas opencv_imgcodecs pcl_filters pcl_features pcl_search pcl_io ${TBB_LIBRARIES})
+target_compile_definitions(cvo_utils_loam_lib PRIVATE -DIS_USING_LOAM )
+target_link_libraries(cvo_utils_loam_lib  opencv_core opencv_highgui opencv_photo elas opencv_imgcodecs pcl_filters pcl_features pcl_io ${TBB_LIBRARIES})
 
 
 add_library(bki_mapping_lib SHARED ${BKI_MAPPING_SOURCE})
@@ -227,7 +235,6 @@ add_library(pose_graph_normal_lib SHARED ${POSE_GRAPH_SOURCE})
 target_link_libraries(pose_graph_normal_lib PRIVATE cvo_utils_normal_lib bki_mapping_lib cvo_cpu_lib opencv_core opencv_imgcodecs boost_filesystem  gtsam gtsam_unstable pcl_io )
 
 add_library(pose_graph_loam_lib SHARED ${POSE_GRAPH_SOURCE})
-target_compile_definitions(pose_graph_loam_lib PRIVATE -DIS_USING_LOAM -DIS_USING_NORMALS)
 target_link_libraries(pose_graph_loam_lib PRIVATE cvo_utils_loam_lib bki_mapping_lib cvo_cpu_lib opencv_core opencv_imgcodecs boost_filesystem  gtsam gtsam_unstable pcl_io )
 
 
@@ -332,7 +339,7 @@ set_target_properties(cvo_gpu_lidar_normal_lib PROPERTIES
 
 
 add_library(cvo_gpu_lidar_loam_lib SHARED ${CVO_GPU_SOURCE})
-target_compile_definitions(cvo_gpu_lidar_loam_lib PRIVATE -DNUM_CLASSES=19 -DFEATURE_DIMENSIONS=1 -DIS_GEOMETRIC_ONLY -DIS_USING_LOAM -DIS_USING_NORMALS)
+target_compile_definitions(cvo_gpu_lidar_loam_lib PRIVATE -DNUM_CLASSES=19 -DFEATURE_DIMENSIONS=1 -DIS_GEOMETRIC_ONLY -DIS_USING_LOAM)
 target_link_libraries(cvo_gpu_lidar_loam_lib PRIVATE lie_group_utils cvo_utils_loam_lib )
 set_target_properties(cvo_gpu_lidar_loam_lib PROPERTIES
   POSITION_INDEPENDENT_CODE ON

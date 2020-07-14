@@ -7,7 +7,7 @@ do
     echo "/********************** New Iteration *************************/"
 
     #gdb -ex run --args \
-	    ./build/bin/cvo_align_gpu_lidar_raw /home/rayzhang/data/kitti_lidar/dataset/sequences/$i cvo_params/cvo_geometric_params_gpu.yaml \
-                                       cvo_geometric_$i.txt 0 1000000
+	    ./build/bin/cvo_align_gpu_lidar_raw /home/justin/data/kitti/sequences/$i cvo_params/cvo_geometric_params_gpu.yaml \
+                                       results/lidar_geometric_result/cvo_geometric_$i"_test.txt" 0 1000000
     
 done

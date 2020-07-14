@@ -275,7 +275,6 @@ namespace cvo{
      lps.legoloam_point_selector(pc, pc_out_surface, edge_or_surface);    
      *pc_out += *pc_out_edge;
      *pc_out += *pc_out_surface;
-     normals_out_ = compute_pcd_normals(pc_out, 1.0);
 #endif
 
 #if defined(IS_USING_LOAM) && defined(IS_USING_NORMALS)
