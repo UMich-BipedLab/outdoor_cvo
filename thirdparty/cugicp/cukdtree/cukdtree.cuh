@@ -401,11 +401,11 @@ void cuKdTree<PointT>::SetInputCloud(cuPointCloudSharedPtr &d_cloud) {
   Results_t temp_result;
   temp_result.range.start = 0;
   temp_result.range.stop = n_tree_points_ - 1;
-  std::cout << "N tree points: " << n_tree_points_
-            << " Start: " << temp_result.range.start
-            << " Stop: " << temp_result.range.stop
-            << " log tree points: " << log_tree_points << " log2n: " << log2n
-            << " large_n: " << large_n << std::endl;
+  // std::cout << "N tree points: " << n_tree_points_
+  //           << " Start: " << temp_result.range.start
+  //           << " Stop: " << temp_result.range.stop
+  //           << " log tree points: " << log_tree_points << " log2n: " << log2n
+  //           << " large_n: " << large_n << std::endl;
   thrust::device_vector<Results_t> d_results, d_new_results;
   d_results.resize(n_tree_points_);
   d_new_results.resize(n_tree_points_);
@@ -450,8 +450,8 @@ void cuKdTree<PointT>::SetInputCloud(cuPointCloudSharedPtr &d_cloud) {
     int blocks = ceil((float)n_active / (float)thread_num);
     if (profile_) {
       t1_ = std::chrono::high_resolution_clock::now();
-      std::cout << "Active Nodes: " << n_active << " Blocks " << blocks
-                << std::endl;
+      // std::cout << "Active Nodes: " << n_active << " Blocks " << blocks
+                // << std::endl;
     }
     smallNodeStage<PointT><<<blocks, thread_num>>>(
         d_point_cloud_->points, d_results, d_new_results, d_tree_,

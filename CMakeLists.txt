@@ -19,12 +19,15 @@ set(CMAKE_VERBOSE_MAKEFILE ON)
 #set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 #set (CMAKE_POSITION_INDEPENDENT_CODE FALSE)
 add_compile_options(-std=c++14)
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# list(APPEND CUDA_NVCC_FLAGS "--compiler-options -fPIC")
 # Release Mode
-set(CMAKE_BUILD_TYPE Release)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -O3 -msse  -msse2 -msse3 -msse4 -mavx2 -ftree-vectorize" )
+# set(CMAKE_BUILD_TYPE Release)
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -O3 -msse  -msse2 -msse3 -msse4 -mavx2 -ftree-vectorize" )
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -O3 -lmkl_intel_lp64 -lmkl_core -lmkl -liomp -msse  -msse2 -msse3 -msse4 -mavx2 -ftree-vectorize" )
-#set(CMAKE_BUILD_TYPE Debug)
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -g  -msse -msse2 -msse3 -msse4 -mavx2 -ftree-vectorize" )
+set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -g  -msse -msse2 -msse3 -msse4 -mavx2 -ftree-vectorize" )
 
 #set(BUILD_TYPE RelWithDebInfo)
 #set(CMAKE_CXX_STANDARD 14)
@@ -80,10 +83,15 @@ find_package(CUDA)
 #set (CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -std=c++14; -Xcompiler -fPIC; -rdc=true; -Wno-deprecated-gpu-targets; -lgsl; -lgslcblas; -lm; -O2; -use_fast_math; --extended-lambda; -gencode arch=compute_75,code=sm_75;)
 #list(APPEND CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS}  "-Xcompiler -std=c++14  -O3 -rdc=true -Wno-deprecated-gpu-targets -lgsl -lgslcblas -lm -use_fast_math"  )
 #list(APPEND CMAKE_CUDA_FLAGS ${CMAKE_CUDA_FLAGS} "-ccbin g++-8 --extended-lambda -gencode arch=compute_75,code=sm_75" )
-set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS}  --extended-lambda  -gencode arch=compute_61,code=sm_61"  )
+set (CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS}  --expt-extended-lambda  -gencode arch=compute_61,code=sm_61"  )
 foreach(flag IN LISTS " -rdc=true; -Wno-deprecated-gpu-targets; -lgsl; -lgslcblas; -lm; -use_fast_math"  )
   add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=${flag}>")
 endforeach()
+
+get_property(core_options TARGET Qt5::Core PROPERTY INTERFACE_COMPILE_OPTIONS)
+string(REPLACE "-fPIC" "" new_core_options ${core_options})
+set_property(TARGET Qt5::Core PROPERTY INTERFACE_COMPILE_OPTIONS ${new_core_options})
+set_property(TARGET Qt5::Core PROPERTY INTERFACE_POSITION_INDEPENDENT_CODE "ON")
 
 #set (CUDA_NVCC_FLAGS "${CMAKE_CUDA_FLAGS}  --extended-lambda  -gencode arch=compute_75,code=sm_75"  )
 #set (CMAKE_CUDA_FLAGS "  --extended-lambda  -gencode arch=compute_75,code=sm_75"  )
@@ -198,6 +206,10 @@ add_library(cvo_utils_lib SHARED ${CVO_UTILS_SOURCE})
 target_compile_definitions(cvo_utils_lib PRIVATE -DIS_USING_RANGE_ELL)
 target_link_libraries(cvo_utils_lib opencv_core opencv_photo opencv_highgui elas opencv_imgcodecs pcl_filters pcl_features pcl_io pcl_search ${TBB_LIBRARIES})
 
+add_library(cvo_utils_range_ell_lib SHARED ${CVO_UTILS_SOURCE})
+target_compile_definitions(cvo_utils_range_ell_lib PRIVATE -DIS_USING_RANGE_ELL)
+target_link_libraries(cvo_utils_range_ell_lib opencv_core opencv_photo opencv_highgui elas opencv_imgcodecs pcl_filters pcl_features pcl_io pcl_search ${TBB_LIBRARIES})
+
 if (${PROJECT_NAME}_ENABLE_CUDA)
 add_library(cvo_utils_cov_lib SHARED ${CVO_UTILS_COVARIANCE_SOURCE})
 target_compile_definitions(cvo_utils_cov_lib PRIVATE -DIS_USING_COVARIANCE)
@@ -205,6 +217,15 @@ set_target_properties(cvo_utils_cov_lib PROPERTIES
   LANGUAGE CUDA
   CUDA_SOURCE_PROPERTY_FORMAT OBJ)
 target_link_libraries(cvo_utils_cov_lib cukdtree_lib opencv_core opencv_photo opencv_highgui elas opencv_imgcodecs pcl_filters pcl_features pcl_io pcl_search ${TBB_LIBRARIES})
+endif()
+
+if (${PROJECT_NAME}_ENABLE_CUDA)
+add_library(cvo_utils_curv_lib SHARED ${CVO_UTILS_COVARIANCE_SOURCE})
+target_compile_definitions(cvo_utils_curv_lib PRIVATE -DIS_USING_RANGE_ELL -DIS_USING_CURVATURE)
+set_target_properties(cvo_utils_curv_lib PROPERTIES
+  LANGUAGE CUDA
+  CUDA_SOURCE_PROPERTY_FORMAT OBJ)
+target_link_libraries(cvo_utils_curv_lib cukdtree_lib opencv_core opencv_photo opencv_highgui elas opencv_imgcodecs pcl_filters pcl_features pcl_io pcl_search ${TBB_LIBRARIES})
 endif()
 
 add_library(cvo_utils_normal_lib SHARED ${CVO_UTILS_SOURCE})
@@ -356,13 +377,21 @@ set_target_properties(cvo_gpu_lidar_lib PROPERTIES
 
   
 add_library(cvo_gpu_lidar_cov_lib SHARED ${CVO_GPU_SOURCE})
-target_compile_definitions(cvo_gpu_lidar_cov_lib PRIVATE -DNUM_CLASSES=19 -DFEATURE_DIMENSIONS=1 -DIS_GEOMETRIC_ONLY -DIS_USING_COVARIANCE)
+target_compile_definitions(cvo_gpu_lidar_cov_lib PRIVATE -DNUM_CLASSES=19 -DFEATURE_DIMENSIONS=1 -DIS_GEOMETRIC_ONLY -DIS_USING_COVARIANCE -DIS_USING_CURVATURE)
 target_link_libraries(cvo_gpu_lidar_cov_lib PRIVATE lie_group_utils cvo_utils_cov_lib cukdtree_lib)
 set_target_properties(cvo_gpu_lidar_cov_lib PROPERTIES
   POSITION_INDEPENDENT_CODE ON
   CUDA_SEPERABLE_COMPILATION ON
   COMPILE_OPTIONS "$<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:-fPIC>")
-  
+
+
+add_library(cvo_gpu_lidar_curv_lib SHARED ${CVO_GPU_SOURCE})
+target_compile_definitions(cvo_gpu_lidar_curv_lib PRIVATE -DNUM_CLASSES=19 -DFEATURE_DIMENSIONS=1 -DIS_GEOMETRIC_ONLY -DIS_USING_RANGE_ELL -DIS_USING_CURVATURE)
+target_link_libraries(cvo_gpu_lidar_curv_lib PRIVATE lie_group_utils cvo_utils_curv_lib cukdtree_lib)
+set_target_properties(cvo_gpu_lidar_curv_lib PROPERTIES
+  POSITION_INDEPENDENT_CODE ON
+  CUDA_SEPERABLE_COMPILATION ON
+  COMPILE_OPTIONS "$<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:-fPIC>")
 
 add_library(cvo_gpu_lidar_normal_lib SHARED ${CVO_GPU_SOURCE})
 target_compile_definitions(cvo_gpu_lidar_normal_lib PRIVATE -DNUM_CLASSES=19 -DFEATURE_DIMENSIONS=1 -DIS_GEOMETRIC_ONLY -DIS_USING_NORMALS)
@@ -372,6 +401,14 @@ set_target_properties(cvo_gpu_lidar_normal_lib PROPERTIES
     CUDA_SEPERABLE_COMPILATION ON
     COMPILE_OPTIONS "$<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:-fPIC>")
 
+	
+add_library(cvo_gpu_lidar_range_ell_lib SHARED ${CVO_GPU_SOURCE})
+target_compile_definitions(cvo_gpu_lidar_range_ell_lib PRIVATE -DNUM_CLASSES=19 -DFEATURE_DIMENSIONS=1 -DIS_GEOMETRIC_ONLY -DIS_USING_RANGE_ELL)
+target_link_libraries(cvo_gpu_lidar_range_ell_lib PRIVATE lie_group_utils cvo_utils_range_ell_lib )
+set_target_properties(cvo_gpu_lidar_range_ell_lib PROPERTIES
+  POSITION_INDEPENDENT_CODE ON
+  CUDA_SEPERABLE_COMPILATION ON
+  COMPILE_OPTIONS "$<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:-fPIC>")
 
 add_library(cvo_gpu_lidar_loam_lib SHARED ${CVO_GPU_SOURCE})
 target_compile_definitions(cvo_gpu_lidar_loam_lib PRIVATE -DNUM_CLASSES=19 -DFEATURE_DIMENSIONS=1 -DIS_GEOMETRIC_ONLY -DIS_USING_LOAM -DIS_USING_NORMALS)
@@ -450,10 +487,15 @@ add_executable(cvo_align_gpu_lidar_raw_cov ${PROJECT_SOURCE_DIR}/src/experiments
 target_compile_definitions(cvo_align_gpu_lidar_raw_cov PRIVATE -DNUM_CLASSES=19 -DFEATURE_DIMENSIONS=1 -DIS_GEOMETRIC_ONLY -DIS_USING_COVARIANCE)
 target_link_libraries(cvo_align_gpu_lidar_raw_cov cvo_gpu_lidar_cov_lib kitti cvo_utils_cov_lib boost_filesystem boost_system pcl_visualization ${VTK_LIBRARIES})
 
+add_executable(cvo_align_gpu_lidar_raw_curv ${PROJECT_SOURCE_DIR}/src/experiments/main_cvo_gpu_lidar_raw_curvature.cpp)
+target_compile_definitions(cvo_align_gpu_lidar_raw_curv PRIVATE -DNUM_CLASSES=19 -DFEATURE_DIMENSIONS=1 -DIS_GEOMETRIC_ONLY -DIS_USING_RANGE_ELL -DIS_USING_CURVATURE)
+target_link_libraries(cvo_align_gpu_lidar_raw_curv cvo_gpu_lidar_curv_lib kitti cvo_utils_curv_lib boost_filesystem boost_system pcl_visualization ${VTK_LIBRARIES})
 
-add_executable(cvo_align_gpu_lidar_normal ${PROJECT_SOURCE_DIR}/src/experiments/main_cvo_gpu_lidar_raw.cpp)
-target_compile_definitions(cvo_align_gpu_lidar_normal PRIVATE -DNUM_CLASSES=19 -DFEATURE_DIMENSIONS=1 -DIS_GEOMETRIC_ONLY -DIS_USING_NORMALS)
-target_link_libraries(cvo_align_gpu_lidar_normal cvo_gpu_lidar_normal_lib pose_graph_normal_lib cvo_utils_normal_lib boost_filesystem boost_system kitti)
+
+
+add_executable(cvo_align_gpu_lidar_range_ell ${PROJECT_SOURCE_DIR}/src/experiments/main_cvo_gpu_lidar_raw_geometric.cpp)
+target_compile_definitions(cvo_align_gpu_lidar_range_ell PRIVATE -DNUM_CLASSES=19 -DFEATURE_DIMENSIONS=1 -DIS_GEOMETRIC_ONLY -DIS_USING_RANGE_ELL)
+target_link_libraries(cvo_align_gpu_lidar_range_ell cvo_gpu_lidar_range_ell_lib cvo_utils_range_ell_lib boost_filesystem boost_system kitti)
 
 
 add_executable(cvo_align_gpu_lidar_loam ${PROJECT_SOURCE_DIR}/src/experiments/main_cvo_gpu_lidar_raw.cpp)

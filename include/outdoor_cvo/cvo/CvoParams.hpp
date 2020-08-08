@@ -28,6 +28,8 @@ namespace cvo {
     float c_sigma;      // kernel signal variance for color kernel
     float s_ell;        // length-scale for semantic labels
     float s_sigma;      // signal variance for semantic labels
+    float curv_ell;
+    float curv_sigma;
     int MAX_ITER;       // maximum number of iteration
     float eps;          // the program stops if norm(omega)+norm(v) < eps
     float eps_2;        // threshold for se3 distance
@@ -66,6 +68,8 @@ namespace cvo {
     params->c_sigma = (float) fs["c_sigma"];
     params->s_ell = (float) fs["s_ell"];
     params->s_sigma = (float) fs["s_sigma"];
+    params->curv_ell = (float) fs["curv_ell"];
+    params->curv_sigma = (float) fs["curv_sigma"];
     params->MAX_ITER = (float) fs["MAX_ITER"];
     params->eps = (float) fs["eps"];
     params->eps_2 = (float) fs["eps_2"];

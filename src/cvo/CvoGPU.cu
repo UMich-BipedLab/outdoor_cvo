@@ -16,7 +16,7 @@
 #include <pcl/point_cloud.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/common/transforms.h>
-
+#include <pcl/impl/instantiate.hpp>
 
 #include <thrust/functional.h>
 #include <thrust/transform.h>
@@ -39,12 +39,14 @@
 using namespace std;
 using namespace nanoflann;
 
+// extern template struct pcl::PointSegmentedDistribution<FEATURE_DIMENSIONS, NUM_CLASSES>;
+
 namespace cvo{
   
   typedef Eigen::Triplet<float> Trip_t;
 
   static bool is_logging = true;
-  static bool debug_print =true;
+  static bool debug_print =false;
 
 
 
@@ -113,6 +115,13 @@ namespace cvo{
       if (i == 0)
         std::cout<<"cov_eigenvalues "<<host_cloud[i].cov_eigenvalues[0]<<", "<<host_cloud[i].cov_eigenvalues[1]<<", "<<host_cloud[i].cov_eigenvalues[2]<<std::endl;
 #endif      
+
+#ifdef IS_USING_CURVATURE
+      memcpy(host_cloud[i].curvatures, cvo_cloud.curvatures().data() + i*3, sizeof(float)*3);  
+      if (i == 0)
+        std::cout<<"curvatures: "<<host_cloud[i].curvatures[0]<<", "<<host_cloud[i].curvatures[1]<<", "<<host_cloud[i].curvatures[2]<<std::endl;
+ 
+#endif
 
       //if (i == 1000) {
       //  printf("Total %d, Raw input from pcl at 1000th: \n", num_points);
@@ -212,6 +221,10 @@ namespace cvo{
       memcpy(result.cov_eigenvalues, p_init.cov_eigenvalues, sizeof(float)*3);
       
 #endif      
+
+#ifdef IS_USING_CURVATURE
+      memcpy(result.curvatures, p_init.curvatures, sizeof(float)*3);    
+#endif
       return result;
     }
   };
@@ -588,7 +601,7 @@ namespace cvo{
                                    // output
                                    SparseKernelMat * A_mat // the kernel matrix!
                                    ) {
-
+    
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i > a_size - 1)
       return;
@@ -634,6 +647,8 @@ namespace cvo{
       CvoPoint * p_b = &points_b[ind_b];
       float d2 = (squared_dist( *p_b ,*p_a ));
       float normal_ip = 1;
+      float curv_k = 1;
+
 #ifdef IS_USING_NORMALS
       normal_ip = fabs(p_a->normal[0] * p_b->normal[0] +
                        p_a->normal[1] * p_b->normal[1] +
@@ -655,8 +670,25 @@ namespace cvo{
       
       if(d2<d2_thres  ){
 
+#ifdef IS_USING_CURVATURE
+        // float d2_curv = squared_dist(p_a->curvatures,p_b->curvatures,3);
+
+        // // printf("curv a: %f, %f, %f \n curv b: %f, %f, %f \n d2_curv: %f \n",\
+        // // p_a->curvatures[0],p_a->curvatures[1],p_a->curvatures[2],\
+        // // p_b->curvatures[0],p_b->curvatures[1],p_b->curvatures[2],\
+        // // d2_curv);
+        
+        // float curv_sigma2 = cvo_params->curv_sigma*cvo_params->curv_sigma;
+        // float curv_ell2 = cvo_params->curv_ell*cvo_params->curv_ell;
+        // curv_k = curv_sigma2*exp(-d2_curv/(2.0*curv_ell2));
+
+        // curv_k = fabs(p_a->curvatures[0] * p_b->curvatures[0] +
+        //   p_a->curvatures[1] * p_b->curvatures[1] +
+        //   p_a->curvatures[2] * p_b->curvatures[2]) * cvo_params->curv_sigma;
+#endif 
+
 #ifdef IS_GEOMETRIC_ONLY
-        float a = sigma2*exp(-d2/(2.0*l*l)) * normal_ip;
+        float a = sigma2*exp(-d2/(2.0*l*l)) * normal_ip * curv_k;
         //       printf("a is %f, normal_ip is %f, final_a is %f\n", s2*exp(-d2/(2.0*l*l)), normal_ip, a );
         if (a > cvo_params->sp_thres){
           A_mat->mat[i * A_mat->cols + num_inds] = a;
@@ -783,6 +815,7 @@ namespace cvo{
     CvoPoint * points_moving_raw = thrust::raw_pointer_cast( points_moving->points.data() );
     
 #ifdef IS_USING_RANGE_ELL    
+    // std::cout<<"is using range ell"<<std::endl;
     fill_in_A_mat_gpu_range_ell<<<(points_moving->size() / CUDA_BLOCK_SIZE)+1, CUDA_BLOCK_SIZE  >>>(params_gpu,
                                                                                                     points_fixed_raw,
                                                                                                     fixed_size,
@@ -793,6 +826,7 @@ namespace cvo{
                                                                                                     A_mat_gpu // the kernel matrix!
                                                                                                     );
 #elif IS_USING_COVARIANCE
+    // std::cout<<"is using dense matrix kernel"<<std::endl;                                                                                                   
     fill_in_A_mat_gpu_dense_mat_kernel<<<(points_moving->size() / CUDA_BLOCK_SIZE)+1, CUDA_BLOCK_SIZE  >>>(// input
                                                                                                            params_gpu,
                                                                                                            points_fixed_raw,
@@ -1290,6 +1324,7 @@ __global__ void compute_step_size_poly_coeff_location_dependent_ell(float ell,
 
     assert(source_gpu != nullptr && target_gpu != nullptr);
     std::cout<<"Pc non-empty\n";
+    std::cout<<"before construct cvo state..., init ell is: "<<params.ell_init<<std::endl;
     CvoState cvo_state(source_gpu, target_gpu, params);
     std::cout<<"construct new cvo state..., init ell is "<<cvo_state.ell<<std::endl;
 

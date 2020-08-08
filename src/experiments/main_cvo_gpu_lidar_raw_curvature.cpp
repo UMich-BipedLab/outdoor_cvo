@@ -114,6 +114,7 @@ int main(int argc, char *argv[]) {
   init_param.ell_init = init_param.ell_init_first_frame;
   init_param.ell_max = init_param.ell_max;
   cvo_align.write_params(&init_param);
+  std::cout<<"init ell in main: "<<init_param.ell_init<<std::endl;
   
   Eigen::Matrix4f init_guess = Eigen::Matrix4f::Identity();  // from source frame to the target frame
   init_guess(2,3)=0.0;

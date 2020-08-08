@@ -23,6 +23,7 @@ namespace pcl {
     int   label;
     float label_distribution[NUM_CLASS]; 
     float normal[3];
+    float curvatures[3];
     float covariance[9];
     float cov_eigenvalues[3];
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW   // make sure our new allocators are aligned
@@ -42,6 +43,7 @@ namespace pcl {
       memset(features, 0, sizeof(float) * FEATURE_DIM);
       memset(label_distribution, 0, sizeof(float) * NUM_CLASS);
       memset(normal, 0, sizeof(float)*3);
+      memset(curvatures, 0, sizeof(float)*3);
       memset(covariance, 0, sizeof(float)*9);
       memset(cov_eigenvalues, 0, sizeof(float)*3);
     }
@@ -60,6 +62,7 @@ namespace pcl {
       memset(features, 0, sizeof(float) * FEATURE_DIM);
       memset(label_distribution, 0, sizeof(float) * NUM_CLASS);
       memset(normal, 0, sizeof(float)*3);
+      memset(curvatures, 0, sizeof(float)*3);
       memset(covariance, 0, sizeof(float)*9);
       memset(cov_eigenvalues, 0, sizeof(float)*3);
     }
@@ -78,6 +81,7 @@ namespace pcl {
       memcpy(features, other.features, sizeof(float) * FEATURE_DIM);
       memcpy(label_distribution, other.label_distribution, sizeof(float) * NUM_CLASS);
       memcpy(normal, other.normal, sizeof(float)*3);
+      memcpy(curvatures, other.curvatures, sizeof(float)*3);
       memcpy(covariance, other.covariance, sizeof(float)*9);
       memcpy(cov_eigenvalues, other.cov_eigenvalues, sizeof(float)*3);
     }
@@ -130,6 +134,11 @@ namespace pcl {
       std::cout<<std::endl;
       for (int i = 0; i < NUM_CLASS; i++)
         std::cout<<p.label_distribution[i]<<", ";
+      std::cout<<std::endl;
+      
+      std::cout<<"curvatures are: \n";
+      for (int i=0; i<3; i++)
+        std::cout<<p.curvatures[i]<<" ";
       std::cout<<std::endl;
 
       std::cout<<"covariance matrix is \n";
