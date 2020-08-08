@@ -1,7 +1,6 @@
 #include "cvo/CvoState.cuh"
-#include "cvo/gpu_utils.cuh"
-#include "cukdtree/cukdtree.h"
 #include <chrono>
+
 #include <thrust/functional.h>
 #include <thrust/transform.h>
 #include <thrust/device_vector.h>
@@ -11,10 +10,71 @@
 #include <thrust/copy.h>
 
 
-// explicit template instantiation
-template struct pcl::PointSegmentedDistribution<FEATURE_DIMENSIONS, NUM_CLASSES>;
-
 namespace cvo {
+
+  /*   helper functions  */
+
+  __global__
+  void init_covariance(CvoPoint * points, // mutate
+                       int num_points,
+                       int * neighbors,
+                       int num_neighbors_each_point
+                       ) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i > num_points - 1) {
+      return;
+    }
+
+    CvoPoint & curr_p = points[i];
+    Eigen::Vector3f curr_p_vec;
+    curr_p_vec << curr_p.x, curr_p.y, curr_p.z;
+    int * indices = neighbors + i * num_neighbors_each_point
+    
+    Eigen::Vector3f mean(0, 0, 0);
+    Eigen::Matrix3f covariance = Eigen::Matrix3f::Zero();
+
+    for (int j = 0; j < num_neighbors_each_point; j++) {
+      
+      mean = mean + points.data[k_nns.data[i]].toVec();
+    }
+  mean = mean * (1.0f / (float)(k));
+
+  for (int i = pos * k; i < (pos + 1) * k; i++) {
+    Eigen::Vector3f temp = points.data[k_nns.data[i]].toVec() - mean;
+    Eigen::Matrix3f temp_m = temp * temp.transpose();
+    covariance = covariance + temp_m;
+  }
+
+  /* PCA */
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> es(3);
+  es.computeDirect(covariance);
+  // Eigen values are sorted
+  Eigen::Matrix3f eigen_value_replacement = Eigen::Matrix3f::Zero();
+  eigen_value_replacement(0, 0) = 1e-3;
+  eigen_value_replacement(1, 1) = 1.0;
+  eigen_value_replacement(2, 2) = 1.0;
+  covariances.data[pos] = es.eigenvectors() * eigen_value_replacement *
+                          es.eigenvectors().transpose();
+  covariance = covariances.data[pos];
+  }
+
+  
+  void fill_in_pointcloud_covariance(perl_registration::cuKdTree<CvoPoint>::SharedPtr kdtree,
+                                     std::shared_ptr<CvoPointCloudGPU> pointcloud_gpu ) {
+    auto start chrono::system_clock::now();
+    thrust::device_vector<int> indices;
+    const int num_wanted_points = 20;
+    kdtree->NearestKSearch(pointcloud_gpu, num_wanted_points, indices );
+    ind_device = thrust::raw_pointer_cast(indices.data() );
+    auto end = chrono::system_clock::now();
+    chrono::duration<double> t_kdtree_search = end-start;
+    std::cout<<"t kdtree search in se_kernel is "<<t_kdtree_search.count()<<std::endl;
+
+
+
+    
+  }
+
 
 
   /*   class member functions  */
@@ -29,10 +89,10 @@ namespace cvo {
     num_moving (target_points->size()),
     ell (cvo_params.ell_init),
     ell_max (cvo_params.ell_max),
-    partial_dl_gradient(cvo_params.is_ell_adaptive?num_fixed:1, 0),
-    partial_dl_Ayy(cvo_params.is_ell_adaptive?num_moving:1, 0),
-    omega_gpu(num_fixed, Eigen::Vector3d::Zero()),
-    v_gpu(num_fixed,Eigen::Vector3d::Zero()),
+    partial_dl_gradient(is_adaptive?num_fixed:1),
+    partial_dl_Ayy(is_adaptive?num_moving:1),
+    omega_gpu(num_fixed),
+    v_gpu(num_fixed),
     //omega_gpu(is_adaptive?num_fixed :num_moving),
     //v_gpu(is_adaptive?num_fixed :num_moving),
     /*
@@ -44,17 +104,17 @@ namespace cvo {
     sum_diff_xx_2(),
     sum_diff_yy_2(),
     */
-    xiz(num_moving, Eigen::Vector3f_row::Zero()),
-    xi2z(num_moving, Eigen::Vector3f_row::Zero()),
-    xi3z(num_moving, Eigen::Vector3f_row::Zero()),
-    xi4z(num_moving, Eigen::Vector3f_row::Zero()),
-    normxiz2(num_moving, 0),
-    xiz_dot_xi2z(num_moving, 0),
-    epsil_const(num_moving, 0),
-    B(num_fixed, 0),
-    C(num_fixed, 0),
-    D(num_fixed, 0),
-    E(num_fixed, 0),
+    xiz(num_moving),
+    xi2z(num_moving),
+    xi3z(num_moving),
+    xi4z(num_moving),
+    normxiz2(num_moving),
+    xiz_dot_xi2z(num_moving),
+    epsil_const(num_moving),
+    B(num_fixed),
+    C(num_fixed),
+    D(num_fixed),
+    E(num_fixed),
 
     //B(is_adaptive?num_fixed:num_moving),
     //C(is_adaptive?num_fixed:num_moving),
@@ -62,13 +122,14 @@ namespace cvo {
     //E(is_adaptive?num_fixed:num_moving),
     is_ell_adaptive(cvo_params.is_ell_adaptive)
   {
-    std::cout<<"start construct CvoState\n";
+
     // gpu raw
     //int A_rows = is_ell_adaptive?  source_points->size() : target_points->size();
     int A_rows = source_points->size() ;
     int Ayy_rows = target_points->size();
     int Axx_rows = source_points->size();
         
+    //int A_cols = target_points->size();
     int A_cols = CVO_POINT_NEIGHBORS;
     int Axx_cols = CVO_POINT_NEIGHBORS;
 
@@ -86,6 +147,18 @@ namespace cvo {
     cloud_x_gpu = source_points;
     cloud_y_gpu_init = target_points;
     cloud_y_gpu.reset(new CvoPointCloudGPU(num_moving ) );
+    
+    if (cvo_params.is_dense_kernel) {
+      printf("Build kdtree...\n");
+      kdtree_fixed_points.reset(new perl_registration::cuKdTree<CvoPoint>);
+      kdtree_fixed_points->SetInputCloud(source_points);
+      kdtree_moving_points.reset(new perl_registration::cuKdTree<CvoPoint>);
+      kdtree_moving_points->SetInputCloud(target_points);
+      
+      printf("finish building kdtree on fixed_points and target_points\n");
+    }
+
+    std::cout<<"partial_dl_gradient size is "<<partial_dl_gradient.size()<<std::endl;
 
   }
 

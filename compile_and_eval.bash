@@ -1,4 +1,4 @@
-gt_dir=/home/rayzhang/code/docker_home/outdoor_cvo/ground_truth/
+gt_dir=ground_truth/
 
 gicp_results_dir=/home/rayzhang/code/docker_home/outdoor_cvo/baselines/lidar/results_gicp/
 ndt_results_dir=/home/rayzhang/code/docker_home/outdoor_cvo/baselines/lidar/results_ndt/
@@ -15,7 +15,7 @@ g++ -g -o evaluate_odometry evaluate_odometry.cpp matrix.cpp
 cd ../..
 
 
-for seq in 05
+for seq in 00 01 02 03 04 05 06 07 08 09 10
 do
 echo $seq
     #for file in $results_dir"cvo_f2f_tracking_"$seq*; 

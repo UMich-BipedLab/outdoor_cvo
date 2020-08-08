@@ -33,6 +33,7 @@ int main(int argc, char *argv[]) {
   int start_frame = std::stoi(argv[4]);
   kitti.set_start_index(start_frame);
   int max_num = std::stoi(argv[5]);
+  // int rotation_angle = std::stoi(argv[6]);
 
   accum_output <<"1 0 0 0 0 1 0 0 0 0 1 0\n";
 
@@ -53,10 +54,26 @@ int main(int argc, char *argv[]) {
   // start the iteration
 
   pcl::PointCloud<pcl::PointXYZI>::Ptr source_pc(new pcl::PointCloud<pcl::PointXYZI>);
+  // std::vector<int> semantics_source;
+  // kitti.read_next_lidar(source_pc, semantics_source);
   kitti.read_next_lidar(source_pc);
-  std::cout<<"read next lidar\n"; 
-  std::shared_ptr<cvo::CvoPointCloud> source(new cvo::CvoPointCloud(source_pc, 5000, 64));
 
+  // Eigen::Affine3f transform = Eigen::Affine3f::Identity();
+  // float theta = rotation_angle*M_PI/180; // radians angle
+  // // transform(2,3) = rotation_angle;
+  // pcl::PointCloud<pcl::PointXYZI>::Ptr pc_out_temp (new pcl::PointCloud<pcl::PointXYZI>);
+  // transform.rotate (Eigen::AngleAxisf (theta, Eigen::Vector3f::UnitY()));
+  // pcl::transformPointCloud (*source_pc, *pc_out_temp, transform);
+
+  std::cout<<"read next lidar\n"; 
+
+  // std::shared_ptr<cvo::Frame> source(new cvo::Frame(start_frame, pc_out_temp,
+  //                                                   // semantics_source,
+  //                                                   calib));
+  std::shared_ptr<cvo::Frame> source(new cvo::Frame(start_frame, source_pc,
+                                                    // semantics_source,
+                                                    calib));
+  //0.2));
   double total_time = 0;
   int i = start_frame;
   for (; i<min(total_iters, start_frame+max_num)-1 ; i++) {
@@ -71,21 +88,25 @@ int main(int argc, char *argv[]) {
       std::cout<<"finish all files\n";
       break;
     }
-    std::shared_ptr<cvo::CvoPointCloud> target(new cvo::CvoPointCloud(target_pc, 5000, 64));
 
-    std::cout<<"NUm of source pts is "<<source->num_points()<<"\n";
-    std::cout<<"NUm of target pts is "<<target->num_points()<<"\n";
+    std::shared_ptr<cvo::Frame> target(new cvo::Frame(i+1, target_pc, calib));
+
+    // std::cout<<"reading "<<files[cur_kf]<<std::endl;
+    auto source_fr = source->points();
+    std::cout<<"NUm of source pts is "<<source->points().num_points()<<"\n";
+    auto target_fr = target->points();
+    std::cout<<"NUm of target pts is "<<target->points().num_points()<<"\n";
 
     Eigen::Matrix4f result, init_guess_inv;
     init_guess_inv = init_guess.inverse();
-    printf("Start align... num_fixed is %d, num_moving is %d\n", source->num_points(), target->num_points());
+    printf("Start align... num_fixed is %d, num_moving is %d\n", source_fr.num_points(), target_fr.num_points());
     std::cout<<std::flush;
     double this_time = 0;
-    cvo_align.align(*source, *target, init_guess_inv, result, &this_time);
+    cvo_align.align(source_fr, target_fr, init_guess_inv, result, &this_time);
     total_time += this_time;
     
     // get tf and inner product from cvo getter
-    double in_product = cvo_align.inner_product(*source, *target, result);
+    double in_product = cvo_align.inner_product(source_fr, target_fr, result);
 
     //double in_product_normalized = cvo_align.inner_product_normalized();
     //int non_zeros_in_A = cvo_align.number_of_non_zeros_in_A();

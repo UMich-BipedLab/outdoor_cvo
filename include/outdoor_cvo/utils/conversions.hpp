@@ -1,4 +1,3 @@
-#pragma once
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 #include <gtsam/geometry/Pose3.h>

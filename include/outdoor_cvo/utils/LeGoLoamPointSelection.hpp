@@ -52,18 +52,20 @@ public:
     
     void cloudHandler(pcl::PointCloud<pcl::PointXYZI>::Ptr pc_in, 
                       pcl::PointCloud<pcl::PointXYZI>::Ptr pc_out, 
-                      std::vector <float> & edge_or_surface);
-    void cloudHandler(pcl::PointCloud<pcl::PointXYZI>::Ptr pc_in, 
-                      pcl::PointCloud<pcl::PointXYZI>::Ptr pc_out,
                       std::vector <float> & edge_or_surface,
                       std::vector <int> & selected_indexes);
+
+    void random_ground_removal(pcl::PointCloud<pcl::PointXYZI>::Ptr pc_in, 
+                              pcl::PointCloud<pcl::PointXYZI>::Ptr pc_out, 
+                              std::vector <float> & edge_or_surface,
+                              std::vector <int> & selected_indexes);
 
 private:
            
     // ImageProjection from LeGO-LOAM
 
     pcl::PointCloud<PointType>::Ptr laserCloudIn;
-  pcl::PointCloud<pcl::PointXYZIR>::Ptr laserCloudInRing;
+    pcl::PointCloud<pcl::PointXYZIR>::Ptr laserCloudInRing;
 
     pcl::PointCloud<PointType>::Ptr fullCloud; // projected velodyne raw cloud, but saved in the form of 1-D matrix
     pcl::PointCloud<PointType>::Ptr fullInfoCloud; // same as fullCloud, but with intensity - range
@@ -116,6 +118,8 @@ private:
     void groundRemoval();
     void cloudSegmentation(pcl::PointCloud<pcl::PointXYZI>::Ptr pc_out_segmented);
     void labelComponents(int row, int col);
+
+    void randomgroundremoval(pcl::PointCloud<pcl::PointXYZI>::Ptr pc_out);
 
     // FeatureAssociation from LeGO-LOAM
 
@@ -251,11 +255,11 @@ private:
     int frameCount;
 
     void initializationValue();
-    void runFeatureAssociation(pcl::PointCloud<pcl::PointXYZI>::Ptr pc_out, std::vector <float> & edge_or_surface);
+    void runFeatureAssociation(pcl::PointCloud<pcl::PointXYZI>::Ptr pc_out, std::vector <float> & edge_or_surface, std::vector <int> & selected_indexes);
     void adjustDistortion();
     void calculateSmoothness();
     void markOccludedPoints();
-    void extractFeatures(pcl::PointCloud<pcl::PointXYZI>::Ptr pc_out, std::vector <float> & edge_or_surface);
+    void extractFeatures(pcl::PointCloud<pcl::PointXYZI>::Ptr pc_out, std::vector <float> & edge_or_surface, std::vector <int> & selected_indexes);
 
 
     // From utility.h
