@@ -17,6 +17,8 @@
 #include "utils/CvoPixelSelector.hpp"
 #include "utils/LidarPointSelector.hpp"
 
+#include <opencv2/features2d.hpp>
+#include <opencv2/opencv.hpp>
 
 //#include "mapping/bkioctomap.h"
 namespace cvo{
@@ -26,10 +28,10 @@ namespace cvo{
   static bool is_good_point(const Vec3f & xyz, const Vec2i uv, int h, int w ) {
     int u = uv(0);
     int v = uv(1);
-    if ( u < 2 || u > w -3 || v < 2 || v > h-50 )
+    if ( u < 2 || u > w -2 || v < 100 || v > h-30 )
       return false;
 
-    if (xyz.norm() > 40)
+    if (xyz.norm() > 70)
       return false;
 
     return true;
@@ -160,15 +162,56 @@ namespace cvo{
     if(is_using_rgbd){
       int expected_points = 5000;
       std::vector<Vec2i, Eigen::aligned_allocator<Vec2i>> output_uv;
-      select_pixels(rgb_raw_image,
-                    expected_points,
-                    output_uv);
+
+      cv::Mat  rgb_gray;
+      cv::cvtColor(rgb_raw_image.color(), rgb_gray, cv::COLOR_BGR2GRAY);  
+      /*****************************************/
+      // using opencv surf
+      //-- Step 1: Detect the keypoints using SURF Detector
+      int minHessian = 400;
+      std::vector<cv::KeyPoint> keypoints;    
+      //auto detector = cv::xfeatures2d:: SURF::create( minHessian );
+      //auto detector =  cv::FastFeatureDetector::create();
+      cv::FAST(rgb_gray,keypoints, 5,false);
+
+      int thresh = 9, num_want = 15000, num_min = 12000;
+      while (keypoints.size() > num_want)  {
+        std::cout<<"selected "<<keypoints.size()<<" points more than "<<num_want<<std::endl;
+          keypoints.clear();
+          thresh++;
+          cv::FAST(rgb_gray,keypoints, thresh,false);
+          if (thresh == 13) break;
+      }
+      while (keypoints.size() < num_min ) {
+      std::cout<<"selected "<<keypoints.size()<<" points less than "<<num_min<<std::endl;
+          keypoints.clear();
+          thresh--;
+          cv::FAST(rgb_gray,keypoints, thresh,false);
+          if (thresh== 0) break;
+
+      }
+      std::cout<<"FAST selected "<<keypoints.size()<<std::endl;
+      
+      //detector->detect( left_gray, keypoints, cv::Mat() );
+      for (auto && kp: keypoints) {
+        Vec2i p;
+        p(0) = (int)kp.pt.x;
+        p(1) = (int)kp.pt.y;
+        output_uv.push_back(p);
+      }
+
+    /*****************************************/
+    // using DSO semi dense point selector
+    
+      // select_pixels(rgb_raw_image,
+      //               expected_points,
+      //               output_uv);
 
       std::vector<int> good_point_ind;
       int h = rgb_raw_image.color().rows;
       int w = rgb_raw_image.color().cols;
       Mat33f intrinsic = calib.intrinsic();
-
+    
       // cv::Mat img_selected;
       // rgb_raw_image.color().copyTo(img_selected);
 
@@ -213,7 +256,7 @@ namespace cvo{
 
       // cv::imshow("selected img: ",img_selected);
       // cv::waitKey(0);
-      // cv::imwrite("selected_img.jpg", img_selected);
+      // cv::imwrite("selected_img_"+std::to_string(good_point_ind.size())+".jpg", img_selected);
 
       num_points_ = good_point_ind.size();
       num_classes_ = rgb_raw_image.num_class();
@@ -357,7 +400,7 @@ namespace cvo{
 
     }
     //write_to_label_pcd("labeled_input.pcd");
-    write_to_color_pcd("color_stereo.pcd");
+    // write_to_color_pcd("color_stereo.pcd");
   }
   
 
@@ -474,7 +517,7 @@ namespace cvo{
 
     
     std::cout<<"Construct Cvo PointCloud, num of points is "<<num_points_<<" from "<<pc->size()<<" input points "<<std::endl;    
-    write_to_intensity_pcd("kitti_lidar.pcd");
+    // write_to_intensity_pcd("kitti_lidar.pcd");
 
   }
 
@@ -482,7 +525,7 @@ namespace cvo{
   CvoPointCloud::CvoPointCloud(pcl::PointCloud<pcl::PointXYZI>::Ptr pc, const std::vector<int> & semantic,
                                int num_classes, int target_num_points, int beam_num) {
 
-    write_all_to_label_pcd("kitti_semantic_lidar_pre.pcd", *pc, num_classes, semantic);
+    // write_all_to_label_pcd("kitti_semantic_lidar_pre.pcd", *pc, num_classes, semantic);
 
     int expected_points = target_num_points;
     double intensity_bound = 0.4;
@@ -599,8 +642,8 @@ namespace cvo{
 
     }
     std::cout<<"Construct Cvo PointCloud, num of points is "<<num_points_<<" from "<<pc->size()<<" input points "<<std::endl;
-    write_to_label_pcd("kitti_semantic_lidar.pcd");
-    write_to_intensity_pcd("kitti_intensity_lidar.pcd");
+    // write_to_label_pcd("kitti_semantic_lidar.pcd");
+    // write_to_intensity_pcd("kitti_intensity_lidar.pcd");
   }
 
   CvoPointCloud::CvoPointCloud(){}

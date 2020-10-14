@@ -430,10 +430,51 @@ namespace cvo
                      int num_want,
                      // output
                      std::vector<Vec2i, Eigen::aligned_allocator<Vec2i>> & output_uv ) {
+   
+    // PixelSelector selector(raw_image.color().cols, raw_image.color().rows);
+    // std::vector<float> heat_map(raw_image.color().total(), 0);
+    // selector.makeHeatMaps(raw_image,static_cast<float> (num_want), heat_map.data(), output_uv, 5, 0);
+    
+    // bool debug_plot = true;
+    // if (debug_plot) {
+    //   std::cout<<"Number of selected points is "<<output_uv.size()<<"\n";
+    //   cv::Mat heatmap(raw_image.color().rows, raw_image.color().cols, CV_32FC1, heat_map.data());
+    //   int w = heatmap.cols;
+    //   int h = heatmap.rows;
+    //   for (int i = 0; i < output_uv.size(); i++) {
+
+    //     cv::circle(heatmap, cv::Point( output_uv[i](0), output_uv[i](1) ), 1, cv::Scalar(255, 0 ,0), 1);
+
+        
+    //   }
+    //   //cv::imshow("heat map", heatmap);
+    //   //cv::waitKey(200);
+    //   //cv::imwrite("heatmap.png", heatmap);
+      
+    // }
+    
     PixelSelector selector(raw_image.color().cols, raw_image.color().rows);
     std::vector<float> heat_map(raw_image.color().total(), 0);
-    selector.makeHeatMaps(raw_image,static_cast<float> (num_want), heat_map.data(), output_uv, 5, 0);
-    
+    selector.makeHeatMaps(raw_image,static_cast<float> (num_want), heat_map.data(), output_uv, 3, 0);
+    int times = 1;
+    while (output_uv.size() > num_want)  {
+	std::cout<<"selected points more than "<<num_want<<std::endl;
+       std::fill(heat_map.begin(), heat_map.end(), 0);
+       output_uv.clear();
+       
+       selector.makeHeatMaps(raw_image,static_cast<float> (num_want), heat_map.data(), output_uv, 3+times, 0);
+       times ++;
+       if (times == 5) break;
+    }
+    if (output_uv.size() < num_want / 3 * 2) {
+       std::fill(heat_map.begin(), heat_map.end(), 0);
+       output_uv.clear();
+       
+       selector.makeHeatMaps(raw_image,static_cast<float> (num_want), heat_map.data(), output_uv, 3+times-2, 0);
+
+    }
+   
+
     bool debug_plot = true;
     if (debug_plot) {
       std::cout<<"Number of selected points is "<<output_uv.size()<<"\n";
@@ -448,10 +489,9 @@ namespace cvo
       }
       //cv::imshow("heat map", heatmap);
       //cv::waitKey(200);
-      //cv::imwrite("heatmap.png", heatmap);
+      // cv::imwrite("stereo_selected_pixels.png", heatmap);
       
     }
-
   }
 
 
