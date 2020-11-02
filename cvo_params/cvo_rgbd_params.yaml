@@ -10,7 +10,7 @@ sigma: 0.1
 sp_thres: 0.003
 c: 7.0
 d: 7.0
-c_ell: 0.15
+c_ell: 0.08
 c_sigma: 0.6
 s_ell: 0.1
 s_sigma: 0.8

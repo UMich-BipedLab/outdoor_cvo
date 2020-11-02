@@ -1447,7 +1447,7 @@ __global__ void compute_step_size_poly_coeff_location_dependent_ell(float ell,
           break; 
 	}
       }
-      float ip_curr = (float)((double)cvo_state.A_host.nonzero_sum / (double)source_points.num_points() / (double) target_points.num_points());
+      float ip_curr = (float)((double)cvo_state.A_host.nonzero_sum / std::sqrt((double)source_points.num_points() * (double) target_points.num_points()));
       //float ip_curr = (float) this->inner_product(source_points, target_points, transform);
       bool need_decay_ell = A_sparsity_indicator_ell_update( indicator_start_queue,
                                                              indicator_end_queue,
