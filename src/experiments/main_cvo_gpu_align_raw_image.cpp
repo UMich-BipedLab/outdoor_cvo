@@ -126,7 +126,7 @@ int main(int argc, char *argv[]) {
   //kitti.read_next_stereo(source_left, source_right, 19, semantics_source);
   kitti.read_next_stereo(source_left, source_right);
   std::shared_ptr<cvo::RawImage> source_raw(new cvo::RawImage(source_left));
-  std::shared_ptr<cvo::CvoPointCloud> source(new cvo::CvoPointCloud(*source_raw, source_right, calib));
+  std::shared_ptr<cvo::CvoPointCloud> source(new cvo::CvoPointCloud(*source_raw, source_right, calib, false));
   source->write_to_color_pcd("source.pcd");
   
   for (int i = start_frame; i<min(total_iters, start_frame+max_num)-1 ; i++) {
@@ -145,8 +145,8 @@ int main(int argc, char *argv[]) {
     }
 
     std::shared_ptr<cvo::RawImage> target_raw(new cvo::RawImage(left));
-    std::shared_ptr<cvo::CvoPointCloud> target(new cvo::CvoPointCloud(*target_raw, right, calib));
-
+    std::shared_ptr<cvo::CvoPointCloud> target(new cvo::CvoPointCloud(*target_raw, right, calib, false));
+    if (i == start_frame) target->write_to_color_pcd("target.pcd");
     Eigen::Matrix4f result, init_guess_inv;
     Eigen::Matrix4f identity_init = Eigen::Matrix4f::Identity(); 
     

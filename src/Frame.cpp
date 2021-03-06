@@ -20,7 +20,7 @@ namespace cvo {
       w(rgb_image.cols),
       raw_image_(rgb_image),
       calib(calib),
-      points_(raw_image_, depth_image, calib, true),
+      points_(raw_image_, depth_image, calib, true, true),
       local_map_(nullptr),
       is_keyframe_(false),
       tracking_pose_from_last_keyframe_(ind){

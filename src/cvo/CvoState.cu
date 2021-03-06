@@ -33,17 +33,6 @@ namespace cvo {
     partial_dl_Ayy(cvo_params.is_ell_adaptive?num_moving:1, 0),
     omega_gpu(num_fixed, Eigen::Vector3d::Zero()),
     v_gpu(num_fixed,Eigen::Vector3d::Zero()),
-    //omega_gpu(is_adaptive?num_fixed :num_moving),
-    //v_gpu(is_adaptive?num_fixed :num_moving),
-    /*
-    cross_xy(3 * num_moving),
-    diff_yx(),
-    diff_xx(),
-    diff_yy(),
-    sum_diff_yx_2(),
-    sum_diff_xx_2(),
-    sum_diff_yy_2(),
-    */
     xiz(num_moving, Eigen::Vector3f_row::Zero()),
     xi2z(num_moving, Eigen::Vector3f_row::Zero()),
     xi3z(num_moving, Eigen::Vector3f_row::Zero()),
@@ -55,18 +44,12 @@ namespace cvo {
     C(num_fixed, 0),
     D(num_fixed, 0),
     E(num_fixed, 0),
-
-    //B(is_adaptive?num_fixed:num_moving),
-    //C(is_adaptive?num_fixed:num_moving),
-    //D(is_adaptive?num_fixed:num_moving),
-    //E(is_adaptive?num_fixed:num_moving),
     is_ell_adaptive(cvo_params.is_ell_adaptive),
     least_square_LHS(num_fixed, Eigen::Matrix<float, 6,6>::Zero()),
     least_square_RHS(num_fixed, Eigen::Matrix<float, 6,1>::Zero())
   {
     std::cout<<"start construct CvoState\n";
     // gpu raw
-    //int A_rows = is_ell_adaptive?  source_points->size() : target_points->size();
     int A_rows = source_points->size() ;
     int Ayy_rows = target_points->size();
     int Axx_rows = source_points->size();

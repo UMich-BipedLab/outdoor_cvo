@@ -150,25 +150,34 @@ namespace cvo{
       infile.close();
     } else {
       printf("empty CvoPointCloud file!\n");
-      assert(0);
-      
     }
     
   }
   CvoPointCloud::CvoPointCloud(const RawImage & rgb_raw_image,
                                const cv::Mat & depth_image,
                                const Calibration &calib,
-                               const bool& is_using_rgbd){
+                               bool is_using_rgbd,
+			       bool is_downsampling){
+    int h = rgb_raw_image.color().rows;
+    int w = rgb_raw_image.color().cols;
+    
     if(is_using_rgbd){
       int expected_points = 5000;
       std::vector<Vec2i, Eigen::aligned_allocator<Vec2i>> output_uv;
-      select_pixels(rgb_raw_image,
-                    expected_points,
-                    output_uv);
-
+      output_uv.reserve(h * w);
+      if (is_downsampling)
+        select_pixels(rgb_raw_image,
+                      expected_points,
+                      output_uv);
+      else {
+        for (int r = 0; r < h; r++)
+          for (int c = 0 ; c < w; c++) {
+            Vec2i uv;
+            uv << c, r;
+            output_uv.push_back(uv);
+          }
+      }
       std::vector<int> good_point_ind;
-      int h = rgb_raw_image.color().rows;
-      int w = rgb_raw_image.color().cols;
       Mat33f intrinsic = calib.intrinsic();
 
       // cv::Mat img_selected;
@@ -304,103 +313,107 @@ namespace cvo{
   
   CvoPointCloud::CvoPointCloud(const RawImage & left_image,
                                const cv::Mat & right_image,
-                               const Calibration & calib ) {
+                               const Calibration & calib,
+		               bool is_downsampling ) {
     
     cv::Mat  left_gray, right_gray;
     cv::cvtColor(right_image, right_gray, cv::COLOR_BGR2GRAY);
     cv::cvtColor(left_image.color(), left_gray, cv::COLOR_BGR2GRAY);
+    int h = left_image.color().rows;
+    int w = left_image.color().cols;    
 
     std::vector<float> left_disparity;
     StaticStereo::disparity(left_gray, right_gray, left_disparity);
     std::vector<Vec2i, Eigen::aligned_allocator<Vec2i>> output_uv;
-
-    /*****************************************/
+    output_uv.reserve(h*w);
     
-    // using opencv FAST
-    //-- Step 1: Detect the keypoints using SURF Detector
-    int minHessian = 400;
-    std::vector<cv::KeyPoint> keypoints;    
-    //auto detector = cv::xfeatures2d:: SURF::create( minHessian );
-    //auto detector =  cv::FastFeatureDetector::create();
-    cv::FAST(left_gray,keypoints, 5,false);
-
-    // for semantic
-    //int thresh = 4, num_want = 28000, num_min = 15000;
-    //// for geometric
-    int thresh = 4, num_want = 24000, num_min = 15000;
-    while (keypoints.size() > num_want)  {
-      std::cout<<"selected "<<keypoints.size()<<" points more than "<<num_want<<std::endl;
-      keypoints.clear();
-      thresh++;
-      cv::FAST(left_gray,keypoints, thresh,false);
-      if (thresh == 50) break;
-    }
-    while (keypoints.size() < num_min ) {
-      std::cout<<"selected "<<keypoints.size()<<" points less than "<<num_min<<std::endl;
-      keypoints.clear();
-      thresh--;
-      cv::FAST(left_gray,keypoints, thresh,false);
-      if (thresh== 0) break;
-
-    }
-    std::cout<<"FAST selected "<<keypoints.size()<<std::endl;
+    if (is_downsampling) {
+      /*****************************************/
     
-    //detector->detect( left_gray, keypoints, cv::Mat() );
-    for (auto && kp: keypoints) {
-      Vec2i p;
-      p(0) = (int)kp.pt.x;
-      p(1) = (int)kp.pt.y;
-      output_uv.push_back(p);
-    }
-    bool debug_plot = false;
-    if (debug_plot) {
-      std::cout<<"Number of selected points is "<<output_uv.size()<<"\n";
-      cv::Mat heatmap(left_image.color().rows, left_image.color().cols, CV_32FC1, cv::Scalar(0) );
-      int w = heatmap.cols;
-      int h = heatmap.rows;
-      for (int i = 0; i < output_uv.size(); i++) 
-        cv::circle(heatmap, cv::Point( output_uv[i](0), output_uv[i](1) ), 1, cv::Scalar(255, 0 ,0), 1);
-      cv::imwrite("FAST_selected_pixels.png", heatmap);
-    }
-    //cv::imshow("heat map", heatmap);
-    //      //cv::waitKey(200);
+      // using opencv FAST
+      //-- Step 1: Detect the keypoints using SURF Detector
+      int minHessian = 400;
+      std::vector<cv::KeyPoint> keypoints;    
+      //auto detector = cv::xfeatures2d:: SURF::create( minHessian );
+      //auto detector =  cv::FastFeatureDetector::create();
+      cv::FAST(left_gray,keypoints, 5,false);
+
+      // for semantic
+      //int thresh = 4, num_want = 28000, num_min = 15000;
+      //// for geometric
+      int thresh = 4, num_want = 24000, num_min = 15000;
+      while (keypoints.size() > num_want)  {
+        std::cout<<"selected "<<keypoints.size()<<" points more than "<<num_want<<std::endl;
+        keypoints.clear();
+        thresh++;
+        cv::FAST(left_gray,keypoints, thresh,false);
+        if (thresh == 50) break;
+      }
+      while (keypoints.size() < num_min ) {
+        std::cout<<"selected "<<keypoints.size()<<" points less than "<<num_min<<std::endl;
+        keypoints.clear();
+        thresh--;
+        cv::FAST(left_gray,keypoints, thresh,false);
+        if (thresh== 0) break;
+
+      }
+      std::cout<<"FAST selected "<<keypoints.size()<<std::endl;
+    
+      //detector->detect( left_gray, keypoints, cv::Mat() );
+      for (auto && kp: keypoints) {
+        Vec2i p;
+        p(0) = (int)kp.pt.x;
+        p(1) = (int)kp.pt.y;
+        output_uv.push_back(p);
+      }
+      bool debug_plot = false;
+      if (debug_plot) {
+        std::cout<<"Number of selected points is "<<output_uv.size()<<"\n";
+        cv::Mat heatmap(left_image.color().rows, left_image.color().cols, CV_32FC1, cv::Scalar(0) );
+        int w = heatmap.cols;
+        int h = heatmap.rows;
+        for (int i = 0; i < output_uv.size(); i++) 
+          cv::circle(heatmap, cv::Point( output_uv[i](0), output_uv[i](1) ), 1, cv::Scalar(255, 0 ,0), 1);
+        cv::imwrite("FAST_selected_pixels.png", heatmap);
+      }
+      //cv::imshow("heat map", heatmap);
+      //      //cv::waitKey(200);
    
-    //
-    //                }
-    //
+      //
+      //                }
+      //
 	
-    /*****************************************/
-    // using DSO semi dense point selector
-    /*
-      int expected_points = 20000;
-      select_pixels(left_image,
-      expected_points,
-      output_uv);
-    */
-    //******************************************/
-    // using canny or random point selection
-    //std::vector<bool> selected_inds_map;
-    //std::vector<Vec2i, Eigen::aligned_allocator<Vec2i>> final_selected_uv;
-    //stereo_surface_sampling(left_gray, output_uv, true, false,
-    //                         selected_inds_map, final_selected_uv);
-    
-    /********************************************/
-    // using full point cloud
-    /*  output_uv.clear();
-      for (int h = 0; h < left_image.color().cols; h++){
-      for (int w = 0; w < left_image.color().rows; w++){
-      Vec2i uv;
-      uv << h , w;
-      output_uv.push_back(uv);
-      }
-      }
+      /*****************************************/
+      // using DSO semi dense point selector
+      /*
+        int expected_points = 20000;
+        select_pixels(left_image,
+        expected_points,
+        output_uv);
       */
+      //******************************************/
+      // using canny or random point selection
+      //std::vector<bool> selected_inds_map;
+      //std::vector<Vec2i, Eigen::aligned_allocator<Vec2i>> final_selected_uv;
+      //stereo_surface_sampling(left_gray, output_uv, true, false,
+      //                         selected_inds_map, final_selected_uv);
+    
+      /********************************************/
+    } else {
+      // using full point cloud
+      output_uv.clear();
+      for (int c = 0; c < left_image.color().cols; c++){
+        for (int r = 0; r < left_image.color().rows;r++){
+          Vec2i uv;
+          uv << c , r;
+          output_uv.push_back(uv);
+        }
+      }
+    }
     /**********************************************/
     //auto & pre_depth_selected_ind = final_selected_uv;
     auto & pre_depth_selected_ind = output_uv;
     std::vector<int> good_point_ind;
-    int h = left_image.color().rows;
-    int w = left_image.color().cols;
     cv::Mat depth_map(h, w, CV_32F, cv::Scalar(0));
     bool is_recording_depth_map = true;
     static unsigned int depth_map_counter = 0;    
@@ -431,7 +444,7 @@ namespace cvo{
         good_point_ind.push_back(i);
         //good_point_xyz.push_back(xyz);
         positions_.push_back(xyz);
-        
+
       }
     }
      

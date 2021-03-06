@@ -70,11 +70,13 @@ namespace cvo{
 
     float function_angle(const CvoPointCloud& source_points,
                         const CvoPointCloud& target_points,
-                        const Eigen::Matrix4f & source_frame_to_target_frame) const;
+                         const Eigen::Matrix4f & source_frame_to_target_frame,
+                         bool using_geometry=true) const;
 
-    float real_inner_product(const CvoPointCloud& source_points,
-                             const CvoPointCloud& target_points,
-                             const Eigen::Matrix4f & source_frame_to_target_frame) const;
+    float inner_product_gpu(const CvoPointCloud& source_points,
+                            const CvoPointCloud& target_points,
+                            const Eigen::Matrix4f & source_frame_to_target_frame,
+                            bool using_geometry=true) const;
 
   };
 
