@@ -75,7 +75,7 @@ namespace cvo{
     int num_points = cvo_cloud.num_points();
     const ArrayVec3f & positions = cvo_cloud.positions();
     const Eigen::Matrix<float, Eigen::Dynamic, FEATURE_DIMENSIONS> & features = cvo_cloud.features();
-    const Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic> & normals = cvo_cloud.normals();
+
     // const Eigen::Matrix<float, Eigen::Dynamic, 2> & types = cvo_cloud.types();
 #ifdef IS_USING_SEMANTICS
     auto & labels = cvo_cloud.labels();
@@ -105,11 +105,6 @@ namespace cvo{
         host_cloud[i].label_distribution[j] = labels(i,j);
 #endif
       
-#ifdef IS_USING_NORMALS
-      for (int j = 0; j < 3; j++)
-        host_cloud[i].normal[j] = normals(i,j);
-#endif
-
 
 #ifdef IS_USING_COVARIANCE
       memcpy(host_cloud[i].covariance, cvo_cloud.covariance().data()+ i*9, sizeof(float)*9  );
@@ -143,10 +138,6 @@ namespace cvo{
     return gpu_cloud;
   }
 
-  float compute_ranged_lengthscale(float curr_dist_square, float curr_ell, float min_ell, float max_ell ) {
-    
-    
-  }
 
   CvoGPU::CvoGPU(const std::string & param_file) {
     // read_CvoParams(param_file.c_str(), &params);
@@ -288,135 +279,6 @@ namespace cvo{
 
   typedef KDTreeVectorOfVectorsAdaptor<cloud_t, float>  kd_tree_t;
 
-  __global__
-  void fill_in_A_mat_gpu(const CvoParams * cvo_params,
-                         //SquareExpParams * se_params,
-                         CvoPoint * points_a,
-                         int a_size,
-                         CvoPoint * points_b,
-                         int b_size,
-                         int * kdtree_inds,
-                         float ell,
-                         // output
-                         SparseKernelMat * A_mat // the kernel matrix!
-                         ) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i > a_size - 1)
-      return;
-
-    float s2= cvo_params->sigma * cvo_params->sigma;
-    float l = ell ;
-    float c_ell = cvo_params->c_ell;
-    float sp_thres = cvo_params->sp_thres;
-    float c_sigma = cvo_params->c_sigma;
-#ifdef IS_USING_SEMANTICS
-    float s_ell = cvo_params->s_ell;
-#endif
-
-    // convert k threshold to d2 threshold (so that we only need to calculate k when needed)
-    float d2_thres = -2.0*l*l*log(sp_thres/s2);
-    float d2_c_thres = -2.0*c_ell*c_ell*log(sp_thres/c_sigma/c_sigma);
-
-    CvoPoint * p_a =  &points_a[i];
-#ifdef IS_USING_SEMANTICS
-    float * label_a = p_a ->label_distribution;
-#endif
-
-
-    unsigned int num_inds = 0;
-    for (int j = 0; j < b_size ; j++) {
-      int ind_b = j;
-      if (num_inds == CVO_POINT_NEIGHBORS) break;
-
-      CvoPoint * p_b = &points_b[ind_b];
-      float d2 = (squared_dist( *p_b ,*p_a ));
-
-      float normal_ip = 1;
-#ifdef IS_USING_NORMALS
-      normal_ip = fabs(p_a->normal[0] * p_b->normal[0] +
-                       p_a->normal[1] * p_b->normal[1] +
-                       p_a->normal[2] * p_b->normal[2]);
-      //printf("normal ip is %f\n", normal_ip);
-#endif      
-      /*
-        if ( i == 1000 && j== 1074) {
-        CvoPoint * pb = points_b + j;
-        printf("gpu se_kernel: i==%d,j==%d: d2 is %f, d2_thres is %f, point_a (%f, %f, %f), point_b: (%f, %f, %f)\n", i, j,d2, d2_thres,
-        p_a->x, p_a->y, p_a->z,
-        pb->x, pb->y,  pb->z );
-        }*/
-      
-      if(d2<d2_thres  ){
-
-#ifdef IS_GEOMETRIC_ONLY
-        float a = s2*exp(-d2/(2.0*l*l)) * normal_ip;
-        if (a > cvo_params->sp_thres){
-          A_mat->mat[i * A_mat->cols + num_inds] = a;
-          A_mat->ind_row2col[i * A_mat->cols + num_inds] = ind_b;
-          num_inds++;
-        }
-
-#else
-        float d2_color = squared_dist<float>(p_a->features, p_b->features, FEATURE_DIMENSIONS);
-
-#ifdef IS_USING_SEMANTICS            
-        float d2_semantic = squared_dist<float>(p_a->label_distribution, p_b->label_distribution, NUM_CLASSES);
-#endif
-
-
-        /*
-          if (i == 1000 && j==1074) {
-          float * fa = p_a->features;
-          float *fb = p_b->features;
-          printf("gpu se_kernel: i=%d,j=%d: d2_color is %f, d2_c_thres is %f,", i,j,d2_color, d2_c_thres );
-          printf("color feature i == 0, a=(%f,%f,%f,%f,%f), b=(%f,%f,%f,%f,%f)\n",
-          fa[0], fa[1], fa[2], fa[3], fa[4], fb[0], fb[1], fb[2], fb[3], fb[4]);
-          }*/
-
-        //if(d2_color<d2_c_thres){
-
-        //#ifdef IS_GEOMETRIC_ONLY
-        //float a = s2*exp(-d2/(2.0*l*l));
-
-        //#else
-        
-          
-        float k = s2*exp(-d2/(2.0*l*l));
-        float ck = c_sigma*c_sigma*exp(-d2_color/(2.0*c_ell*c_ell));
-#ifdef IS_USING_SEMANTICS              
-        float sk = cvo_params->s_sigma*cvo_params->s_sigma*exp(-d2_semantic/(2.0*s_ell*s_ell));
-#else
-        float sk = 1;
-#endif              
-        float a = ck*k*sk * normal_ip;
-        //#endif          
-
-        //if (i == 1000 && j == 51)
-        //  printf("se_kernel: i=%d,j=%d: d2_color is %f, d2_c_thres is %f,k is %f, ck is %f\n", i,j,d2_color, d2_c_thres, k, ck );
-        // if ( i == 1000 )
-        // printf("se_kernel: i==1000, j==%d: k is %f, ck is %f\n", j, k, ck );
-
-
-
-        // concrrent access !
-        if (a > cvo_params->sp_thres){
-
-          //A_mat->mat[i * A_mat->cols + j] = a;
-          A_mat->mat[i * A_mat->cols + num_inds] = a;
-          A_mat->ind_row2col[i * A_mat->cols + num_inds] = ind_b;
-          num_inds++;
-
-        }// else {
-#endif        
-      }
-
-
-      
-    }
-    A_mat->nonzeros[i] = num_inds;
-    //delete mat_inds;
-    
-  }
 
   __device__
   float mahananobis_distance( const CvoPoint & p_a,const  CvoPoint &p_b) {
@@ -1809,11 +1671,11 @@ namespace cvo{
     CvoPointCloudGPU::SharedPtr target_gpu = CvoPointCloud_to_gpu(target_points);
 
     assert(source_gpu != nullptr && target_gpu != nullptr);
-
+    std::cout<<"1\n";
     CvoState cvo_state(source_gpu, target_gpu, params);
     int num_moving = cvo_state.num_moving;
     int num_fixed = cvo_state.num_fixed;
-
+    std::cout<<"2\n";
     cvo_state.reset_state_at_new_iter();
     Mat44f trans = s2t_frame_transform;
     Mat33f R = trans.block<3,3>(0,0);
@@ -1821,16 +1683,18 @@ namespace cvo{
     //Eigen::Matrix4f id;
     auto id = s2t_frame_transform; 
     id << 1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1;
+        std::cout<<"3\n";
     update_tf(R, T, &cvo_state, id);
+        std::cout<<"4\n";
     transform_pointcloud_thrust(cvo_state.cloud_y_gpu_init, cvo_state.cloud_y_gpu,
                                 cvo_state.R_gpu, cvo_state.T_gpu ); 
-
+    std::cout<<"5\n";
     se_kernel(params_gpu, cvo_state.cloud_x_gpu, cvo_state.cloud_y_gpu,
               cvo_state.ell, using_geometry,
               &cvo_state.A_host, cvo_state.A);
     cudaDeviceSynchronize();
 
-
+    std::cout<<"6\n";
     float ip_value = A_sum(&cvo_state.A_host);
     
 
